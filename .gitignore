@@ -7,47 +7,32 @@ node_modules/
 dist/
 dist-electron/
 release/
-*.dmg
-*.exe
-*.zip
+*.tsbuildinfo
 
-# Logs
-logs
-*.log
-npm-debug.log*
-yarn-debug.log*
-yarn-error.log*
-lerna-debug.log*
-
-# OS
-.DS_Store
-Thumbs.db
+# Environment files
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
 
 # IDE
 .idea/
 .vscode/
 *.swp
 *.swo
-*~
 
-# Environment variables
-.env
-.env.local
-.env.*.local
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+lerna-debug.log*
 
 # Database
 *.db
-*.db-journal
 *.sqlite
 *.sqlite3
-
-# Electron
-out/
-
-# Test
-coverage/
-.nyc_output/
-
-# Cache
-.cache/
-*.tsbuildinfo
