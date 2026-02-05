@@ -126,6 +126,9 @@ export function SpellingPracticePage() {
               // 如果没有需要练习的词，显示提示并使用全部词汇
               alert('恭喜！您已经掌握了这篇文章的所有词汇，将使用全部词汇进行练习。')
               wordsToPractice = uniqueWords.slice(0, wordCount)
+            } else {
+              // 限制单词数量
+              wordsToPractice = wordsToPractice.slice(0, wordCount)
             }
           } else {
             // 全部词汇模式：使用所有单词（不过滤）
@@ -220,6 +223,9 @@ export function SpellingPracticePage() {
           if (wordsToPractice.length === 0) {
             alert('恭喜！您已经掌握了这篇文章的所有词汇，将使用全部词汇进行练习。')
             wordsToPractice = uniqueWords.slice(0, wordCount)
+          } else {
+            // 限制单词数量
+            wordsToPractice = wordsToPractice.slice(0, wordCount)
           }
         } else {
           wordsToPractice = uniqueWords.slice(0, wordCount)
