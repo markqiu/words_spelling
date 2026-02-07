@@ -144,6 +144,11 @@ ipcMain.handle('tts:speak', async (_, text: string) => {
   return new Promise((resolve, reject) => {
     say.speak(text, 'Samantha', 0.9, (err) => {
       if (err) {
+        // 忽略 SIGTERM 错误（由 say.stop() 触发，属于正常中断）
+        if (err.message && err.message.includes('SIGTERM')) {
+          resolve(false)
+          return
+        }
         console.error('TTS error:', err)
         reject(err)
       } else {

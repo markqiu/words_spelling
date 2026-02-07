@@ -20,8 +20,10 @@
 - 📚 **文章库管理** - 支持小说、新闻、故事、传记、专业文章等多种分类
 - 🌐 **自动爬取文章** - 从 Project Gutenberg 和 Wikipedia 获取英文文章
 - 🎯 **拼写练习模式** - 听单词发音，输入正确拼写
+- � **短语听写模式** - 听短句/短语，输入完整内容（使用 NLP 智能分句）
 - 🔊 **语音朗读** - 使用系统 TTS 引擎朗读单词
 - ⌨️ **打字练习模式** - 实时检测输入正确性，逐字符验证
+- ✏️ **文章编辑** - 修改文章标题和内容（保留练习记录）
 - 🏆 **排行榜系统** - 记录练习成绩，与好友比拼
 - 📊 **学习统计** - 追踪词汇掌握进度和错词本
 - ⚙️ **可配置词数** - 支持 10/20/30/50/100 个词的练习量
@@ -61,8 +63,10 @@ npm run build:mac
 - 📚 **Article Library** - Manage articles by category: novels, news, stories, biographies, technical articles
 - 🌐 **Auto Crawling** - Fetch English articles from Project Gutenberg and Wikipedia
 - 🎯 **Spelling Practice** - Listen to word pronunciation and type correct spelling
+- � **Phrase Dictation** - Listen to phrases/sentences and type the complete content (NLP-powered segmentation)
 - 🔊 **Text-to-Speech** - Uses system TTS engine for word pronunciation
 - ⌨️ **Typing Practice** - Real-time character-by-character input validation
+- ✏️ **Article Editing** - Edit article title and content (preserves practice records)
 - 🏆 **Leaderboard** - Track practice scores and compete with friends
 - 📊 **Learning Stats** - Track vocabulary mastery progress and mistake words
 - ⚙️ **Configurable Word Count** - Practice with 10/20/30/50/100 words per session
@@ -101,6 +105,7 @@ npm run build:mac
 - **Build Tool**: Vite
 - **Database**: SQLite (better-sqlite3)
 - **Web Scraping**: Axios + Cheerio
+- **NLP**: Compromise (~250KB, local NLP library for phrase extraction)
 - **TTS**: macOS `say` command (native) / Web Speech API (fallback)
 
 ## 许可证 / License

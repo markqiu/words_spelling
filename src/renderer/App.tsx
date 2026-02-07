@@ -3,6 +3,8 @@ import { Layout } from './components/Layout'
 import { HomePage } from './pages/HomePage'
 import { ArticlesPage } from './pages/ArticlesPage'
 import { CrawlPage } from './pages/CrawlPage'
+import { EditArticlePage } from './pages/EditArticlePage'
+import { PhrasePracticePage } from './pages/PhrasePracticePage'
 import { SpellingPracticePage } from './pages/SpellingPracticePage'
 import { TypingPracticePage } from './pages/TypingPracticePage'
 import { LeaderboardPage } from './pages/LeaderboardPage'
@@ -16,6 +18,8 @@ function App() {
           <Route index element={<HomePage />} />
           <Route path="articles" element={<ArticlesPage />} />
           <Route path="crawl" element={<CrawlPage />} />
+          <Route path="edit/:id" element={<EditArticlePage />} />
+          <Route path="phrase/:id" element={<PhrasePracticePage />} />
           <Route path="spelling/:id" element={<SpellingPracticePage />} />
           <Route path="typing/:id" element={<TypingPracticePage />} />
           <Route path="leaderboard" element={<LeaderboardPage />} />

@@ -26,6 +26,7 @@ export function SpellingPracticePage() {
   const statsRef = useRef({ correct: 0, incorrect: 0 })
   const hasSpokenRef = useRef(false)
   const isRestoringProgressRef = useRef(false)
+  const hasCheckedProgressRef = useRef(false)
 
   // 错词本相关状态
   const [userName, setUserName] = useState<string>((location.state as { userName?: string })?.userName || '练习者')
@@ -118,6 +119,7 @@ export function SpellingPracticePage() {
   useEffect(() => {
     // 重置语音播放标志（每次进入页面都重置）
     hasSpokenRef.current = false
+    hasCheckedProgressRef.current = false
 
     const loadArticle = async (articleId: number) => {
       try {
@@ -194,7 +196,8 @@ export function SpellingPracticePage() {
           }
         }
 
-        if (savedProgress && savedProgress.currentIndex > 0 && savedProgress.currentIndex < savedProgress.wordCount) {
+        if (savedProgress && savedProgress.currentIndex > 0 && savedProgress.currentIndex < savedProgress.wordCount && !hasCheckedProgressRef.current) {
+          hasCheckedProgressRef.current = true
           // 有未完成的进度，询问是否继续
           const shouldContinue = confirm(`检测到您上次练习到第 ${savedProgress.currentIndex + 1} 个单词，是否继续练习？\n（选择"取消"将重新开始）`)
           if (shouldContinue) {
@@ -258,7 +261,8 @@ export function SpellingPracticePage() {
             await window.electronAPI.clearPracticeProgress(userName, articleId)
             await initNewPractice()
           }
-        } else {
+        } else if (!hasCheckedProgressRef.current) {
+          hasCheckedProgressRef.current = true
           // 没有保存的进度，开始新练习
           await initNewPractice()
         }

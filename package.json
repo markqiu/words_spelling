@@ -1,6 +1,6 @@
 {
   "name": "spelling-game",
-  "version": "1.1.0",
+  "version": "1.2.0",
   "description": "单词拼写与打字练习软件",
   "main": "dist-electron/main/main.js",
   "scripts": {
@@ -38,6 +38,7 @@
     "axios": "^1.13.4",
     "better-sqlite3": "^12.6.2",
     "cheerio": "^1.2.0",
+    "compromise": "^14.14.5",
     "react": "^19.2.4",
     "react-dom": "^19.2.4",
     "react-router-dom": "^7.13.0",

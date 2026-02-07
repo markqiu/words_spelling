@@ -172,15 +172,29 @@ export function ArticlesPage() {
                   拼写练习
                 </Link>
                 <Link
+                  to={`/phrase/${article.id}`}
+                  className="btn btn-success"
+                  state={{ userName }}
+                >
+                  短语听写
+                </Link>
+                <Link
                   to={`/typing/${article.id}`}
                   className="btn btn-secondary"
                   state={{ userName }}
                 >
                   背诵练习
                 </Link>
+                <Link
+                  to={`/edit/${article.id}`}
+                  className="btn btn-warning btn-icon"
+                  title="编辑"
+                >
+                  ✏️
+                </Link>
                 <button
                   className="btn btn-error btn-icon"
-                  onClick={() => handleDelete(article.id!)}
+                  onClick={() => article.id !== undefined && handleDelete(article.id)}
                   title="删除"
                   type="button"
                 >

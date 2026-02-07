@@ -138,6 +138,9 @@ export function HomePage() {
                       <Link to={`/spelling/${article.id}`} className="btn btn-primary btn-sm">
                         拼写练习
                       </Link>
+                      <Link to={`/phrase/${article.id}`} className="btn btn-success btn-sm">
+                        短语听写
+                      </Link>
                       <Link to={`/typing/${article.id}`} className="btn btn-secondary btn-sm">
                         背诵练习
                       </Link>
