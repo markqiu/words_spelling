@@ -11,16 +11,118 @@ export class DatabaseManager {
   constructor() {
     const userDataPath = app.getPath('userData')
     this.dbPath = path.join(userDataPath, 'spelling-game.db')
-    
+
     // 确保目录存在
     if (!fs.existsSync(userDataPath)) {
       fs.mkdirSync(userDataPath, { recursive: true })
+    }
+
+    // 升级前备份数据库
+    this.backupDatabase()
+  }
+
+  // 升级前备份数据库
+  private backupDatabase(): void {
+    if (!fs.existsSync(this.dbPath)) return
+
+    const backupPath = `${this.dbPath}.backup.${Date.now()}`
+    try {
+      fs.copyFileSync(this.dbPath, backupPath)
+      console.log(`Database backed up to: ${backupPath}`)
+
+      // 只保留最近 5 个备份
+      this.cleanupOldBackups()
+    } catch (error) {
+      console.error('Database backup failed:', error)
+    }
+  }
+
+  // 清理旧的数据库备份（只保留最近 5 个）
+  private cleanupOldBackups(): void {
+    const userDataPath = path.dirname(this.dbPath)
+    const dbName = path.basename(this.dbPath)
+
+    try {
+      const backups = fs.readdirSync(userDataPath)
+        .filter(file => file.startsWith(`${dbName}.backup.`))
+        .map(file => ({
+          name: file,
+          path: path.join(userDataPath, file),
+          time: fs.statSync(path.join(userDataPath, file)).mtime.getTime()
+        }))
+        .sort((a, b) => b.time - a.time)
+
+      // 删除超过 5 个的备份
+      if (backups.length > 5) {
+        backups.slice(5).forEach(backup => {
+          try {
+            fs.unlinkSync(backup.path)
+            console.log(`Deleted old backup: ${backup.name}`)
+          } catch (error) {
+            console.error(`Failed to delete backup ${backup.name}:`, error)
+          }
+        })
+      }
+    } catch (error) {
+      console.error('Cleanup old backups failed:', error)
     }
   }
 
   initialize() {
     this.db = new Database(this.dbPath)
     this.createTables()
+    this.migrate()
+  }
+
+  // 获取数据库版本
+  private getDbVersion(): number {
+    if (!this.db) return 0
+
+    try {
+      // 检查是否有版本表
+      const tableExists = this.db.prepare(`
+        SELECT name FROM sqlite_master WHERE type='table' AND name='db_version'
+      `).get()
+
+      if (!tableExists) {
+        // 创建版本表
+        this.db.exec(`
+          CREATE TABLE db_version (
+            version INTEGER PRIMARY KEY DEFAULT 1
+          )
+        `)
+        this.db.prepare(`INSERT INTO db_version (version) VALUES (1)`).run()
+        return 1
+      }
+
+      const row = this.db.prepare(`SELECT version FROM db_version`).get() as { version: number } | undefined
+      return row?.version || 1
+    } catch {
+      return 1
+    }
+  }
+
+  // 设置数据库版本
+  private setDbVersion(version: number): void {
+    if (!this.db) return
+
+    this.db.prepare(`UPDATE db_version SET version = ?`).run(version)
+  }
+
+  // 数据库迁移
+  private migrate(): void {
+    const currentVersion = this.getDbVersion()
+    console.log(`Database version: ${currentVersion}`)
+
+    // 版本 2: 添加练习进度表（在 createTables 中已经通过 IF NOT EXISTS 创建了）
+    if (currentVersion < 2) {
+      console.log('Migrating to version 2...')
+      // practice_progress 表已经在 createTables 中创建
+      this.setDbVersion(2)
+    }
+
+    // 未来版本迁移在这里添加
+    // if (currentVersion < 3) { ... }
   }
 
   private createTables() {
@@ -97,6 +199,27 @@ export class DatabaseManager {
       CREATE INDEX IF NOT EXISTS idx_mistake_user ON mistake_words(user_name);
       CREATE INDEX IF NOT EXISTS idx_word_progress_user ON article_word_progress(user_name);
       CREATE INDEX IF NOT EXISTS idx_word_progress_article ON article_word_progress(article_id);
+    `)
+
+    // 练习进度表（保存未完成的练习）
+    this.db.exec(`
+      CREATE TABLE IF NOT EXISTS practice_progress (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        user_name TEXT NOT NULL,
+        article_id INTEGER NOT NULL,
+        current_index INTEGER NOT NULL DEFAULT 0,
+        correct_count INTEGER NOT NULL DEFAULT 0,
+        incorrect_count INTEGER NOT NULL DEFAULT 0,
+        word_count INTEGER NOT NULL DEFAULT 50,
+        practice_mode TEXT NOT NULL DEFAULT 'all',
+        words_list TEXT, -- JSON 数组存储单词列表（用于错题本模式）
+        updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        UNIQUE(user_name, article_id)
+      )
+    `)
+
+    this.db.exec(`
+      CREATE INDEX IF NOT EXISTS idx_practice_progress_user ON practice_progress(user_name);
     `)
   }
 
@@ -512,6 +635,99 @@ export class DatabaseManager {
       `)
       insertStmt.run(userName, articleId, word, mastered ? 1 : 0, errorCount)
     }
+  }
+
+  // ========== 练习进度保存（继续练习功能）==========
+
+  // 保存练习进度
+  savePracticeProgress(
+    userName: string,
+    articleId: number,
+    progress: {
+      currentIndex: number
+      correctCount: number
+      incorrectCount: number
+      wordCount: number
+      practiceMode: string
+      wordsList?: string[]
+    }
+  ): void {
+    if (!this.db) throw new Error('Database not initialized')
+
+    const stmt = this.db.prepare(`
+      INSERT INTO practice_progress 
+        (user_name, article_id, current_index, correct_count, incorrect_count, word_count, practice_mode, words_list, updated_at)
+      VALUES 
+        (?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+      ON CONFLICT(user_name, article_id) DO UPDATE SET
+        current_index = excluded.current_index,
+        correct_count = excluded.correct_count,
+        incorrect_count = excluded.incorrect_count,
+        word_count = excluded.word_count,
+        practice_mode = excluded.practice_mode,
+        words_list = excluded.words_list,
+        updated_at = CURRENT_TIMESTAMP
+    `)
+
+    stmt.run(
+      userName,
+      articleId,
+      progress.currentIndex,
+      progress.correctCount,
+      progress.incorrectCount,
+      progress.wordCount,
+      progress.practiceMode,
+      progress.wordsList ? JSON.stringify(progress.wordsList) : null
+    )
+  }
+
+  // 获取练习进度
+  getPracticeProgress(userName: string, articleId: number): {
+    currentIndex: number
+    correctCount: number
+    incorrectCount: number
+    wordCount: number
+    practiceMode: string
+    wordsList?: string[]
+  } | null {
+    if (!this.db) return null
+
+    const stmt = this.db.prepare(`
+      SELECT * FROM practice_progress 
+      WHERE user_name = ? AND article_id = ?
+    `)
+
+    const row = stmt.get(userName, articleId) as {
+      current_index: number
+      correct_count: number
+      incorrect_count: number
+      word_count: number
+      practice_mode: string
+      words_list: string | null
+    } | undefined
+
+    if (!row) return null
+
+    return {
+      currentIndex: row.current_index,
+      correctCount: row.correct_count,
+      incorrectCount: row.incorrect_count,
+      wordCount: row.word_count,
+      practiceMode: row.practice_mode,
+      wordsList: row.words_list ? JSON.parse(row.words_list) as string[] : undefined
+    }
+  }
+
+  // 清除练习进度
+  clearPracticeProgress(userName: string, articleId: number): void {
+    if (!this.db) return
+
+    const stmt = this.db.prepare(`
+      DELETE FROM practice_progress 
+      WHERE user_name = ? AND article_id = ?
+    `)
+
+    stmt.run(userName, articleId)
   }
 
   // 获取需要练习的词汇列表（错词 + 未掌握的词汇）

@@ -126,6 +126,19 @@ ipcMain.handle('db:getWordsToPractice', (_, userName: string, articleId: number,
   return dbManager.getWordsToPractice(userName, articleId, allWords)
 })
 
+// IPC 处理 - 练习进度
+ipcMain.handle('db:savePracticeProgress', (_, userName: string, articleId: number, progress) => {
+  return dbManager.savePracticeProgress(userName, articleId, progress)
+})
+
+ipcMain.handle('db:getPracticeProgress', (_, userName: string, articleId: number) => {
+  return dbManager.getPracticeProgress(userName, articleId)
+})
+
+ipcMain.handle('db:clearPracticeProgress', (_, userName: string, articleId: number) => {
+  return dbManager.clearPracticeProgress(userName, articleId)
+})
+
 // IPC 处理 - 语音播放
 ipcMain.handle('tts:speak', async (_, text: string) => {
   return new Promise((resolve, reject) => {

@@ -133,12 +133,16 @@ export function HomePage() {
                   </div>
                 </div>
                 <div className="article-actions">
-                  <Link to={`/spelling/${article.id}`} className="btn btn-primary btn-sm">
-                    拼写练习
-                  </Link>
-                  <Link to={`/typing/${article.id}`} className="btn btn-secondary btn-sm">
-                    背诵练习
-                  </Link>
+                  {article.id && (
+                    <>
+                      <Link to={`/spelling/${article.id}`} className="btn btn-primary btn-sm">
+                        拼写练习
+                      </Link>
+                      <Link to={`/typing/${article.id}`} className="btn btn-secondary btn-sm">
+                        背诵练习
+                      </Link>
+                    </>
+                  )}
                 </div>
               </div>
             ))}
@@ -148,6 +152,7 @@ export function HomePage() {
 
       <div className="init-section">
         <button
+          type="button"
           className="btn btn-secondary"
           onClick={handleInitialize}
           disabled={isInitializing}

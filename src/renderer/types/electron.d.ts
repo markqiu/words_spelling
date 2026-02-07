@@ -24,6 +24,25 @@ export interface ElectronAPI {
   updateWordProgress: (userName: string, articleId: number, word: string, mastered: boolean) => Promise<void>
   getWordsToPractice: (userName: string, articleId: number, allWords: string[]) => Promise<string[]>
 
+  // 练习进度（继续练习功能）
+  savePracticeProgress: (userName: string, articleId: number, progress: {
+    currentIndex: number
+    correctCount: number
+    incorrectCount: number
+    wordCount: number
+    practiceMode: string
+    wordsList?: string[]
+  }) => Promise<void>
+  getPracticeProgress: (userName: string, articleId: number) => Promise<{
+    currentIndex: number
+    correctCount: number
+    incorrectCount: number
+    wordCount: number
+    practiceMode: string
+    wordsList?: string[]
+  } | null>
+  clearPracticeProgress: (userName: string, articleId: number) => Promise<void>
+
   // 爬虫
   fetchArticles: (category: string, customUrl?: string) => Promise<CrawledArticle[]>
 

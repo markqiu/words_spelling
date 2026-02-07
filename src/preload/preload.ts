@@ -26,6 +26,11 @@ contextBridge.exposeInMainWorld('electronAPI', {
   updateWordProgress: (userName: string, articleId: number, word: string, mastered: boolean) => ipcRenderer.invoke('db:updateWordProgress', userName, articleId, word, mastered),
   getWordsToPractice: (userName: string, articleId: number, allWords: string[]) => ipcRenderer.invoke('db:getWordsToPractice', userName, articleId, allWords),
 
+  // 练习进度（继续练习功能）
+  savePracticeProgress: (userName: string, articleId: number, progress: { currentIndex: number, correctCount: number, incorrectCount: number, wordCount: number, practiceMode: string, wordsList?: string[] }) => ipcRenderer.invoke('db:savePracticeProgress', userName, articleId, progress),
+  getPracticeProgress: (userName: string, articleId: number) => ipcRenderer.invoke('db:getPracticeProgress', userName, articleId),
+  clearPracticeProgress: (userName: string, articleId: number) => ipcRenderer.invoke('db:clearPracticeProgress', userName, articleId),
+
   // 爬虫
   fetchArticles: (category: string, customUrl?: string) => ipcRenderer.invoke('crawler:fetchArticles', category, customUrl),
 

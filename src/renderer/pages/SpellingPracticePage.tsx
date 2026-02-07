@@ -23,11 +23,25 @@ export function SpellingPracticePage() {
   const [showAnswer, setShowAnswer] = useState(false)
   const inputRef = useRef<HTMLInputElement>(null)
   const timerRef = useRef<NodeJS.Timeout | null>(null)
+  const statsRef = useRef({ correct: 0, incorrect: 0 })
+  const hasSpokenRef = useRef(false)
+  const isRestoringProgressRef = useRef(false)
 
   // 错词本相关状态
   const [userName, setUserName] = useState<string>((location.state as { userName?: string })?.userName || '练习者')
   const [practiceMode, setPracticeMode] = useState<PracticeMode>('all')
   const [wordCount, setWordCount] = useState<number>(50)
+  const practiceModeRef = useRef<PracticeMode>('all')
+  const wordCountRef = useRef<number>(50)
+
+  // 同步 ref 和 state
+  useEffect(() => {
+    practiceModeRef.current = practiceMode
+  }, [practiceMode])
+
+  useEffect(() => {
+    wordCountRef.current = wordCount
+  }, [wordCount])
   const [isInMistakeList, setIsInMistakeList] = useState(false)
   const [isLoading, setIsLoading] = useState(true)
 
@@ -102,54 +116,73 @@ export function SpellingPracticePage() {
   }, [getBestEnglishVoice])
 
   useEffect(() => {
+    // 重置语音播放标志（每次进入页面都重置）
+    hasSpokenRef.current = false
+
     const loadArticle = async (articleId: number) => {
       try {
         setIsLoading(true)
         const art = await window.electronAPI.getArticleById(articleId)
-        if (art) {
-          setArticle(art)
-          // 提取单词（按空格和标点分割）
-          const extractedWords = art.content
-            .replace(/[^\w\s]/g, ' ')
-            .split(/\s+/)
-            .filter((w: string) => w.length > 0 && /^[a-zA-Z]+$/.test(w))
-            .map((w: string) => w.toLowerCase())
-          // 去重
-          const uniqueWords = [...new Set<string>(extractedWords)]
+        if (!art) {
+          setIsLoading(false)
+          return
+        }
 
-          // 根据练习模式获取需要练习的词汇列表
-          let wordsToPractice: string[]
-          if (practiceMode === 'mistake') {
+        setArticle(art)
+
+        // 提取单词（按空格和标点分割）
+        const extractedWords = art.content
+          .replace(/[^\w\s]/g, ' ')
+          .split(/\s+/)
+          .filter((w: string) => w.length > 0 && /^[a-zA-Z]+$/.test(w))
+          .map((w: string) => w.toLowerCase())
+        // 去重
+        const uniqueWords = [...new Set<string>(extractedWords)]
+
+        // 检查是否有保存的练习进度
+        const savedProgress = await window.electronAPI.getPracticeProgress(userName, articleId)
+        let wordsToPractice: string[]
+        let startIndex = 0
+
+        // 辅助函数：开始新练习
+        const initNewPractice = async () => {
+          // 使用 ref 读取当前值，避免依赖 state
+          const currentMode = practiceModeRef.current
+          const currentWordCount = wordCountRef.current
+
+          if (currentMode === 'mistake') {
             // 错词本模式：只练习错词 + 未掌握的词
             wordsToPractice = await window.electronAPI.getWordsToPractice(userName, articleId, uniqueWords)
             if (wordsToPractice.length === 0) {
-              // 如果没有需要练习的词，显示提示并使用全部词汇
               alert('恭喜！您已经掌握了这篇文章的所有词汇，将使用全部词汇进行练习。')
-              wordsToPractice = uniqueWords.slice(0, wordCount)
+              wordsToPractice = uniqueWords.slice(0, currentWordCount)
             } else {
-              // 限制单词数量
-              wordsToPractice = wordsToPractice.slice(0, wordCount)
+              wordsToPractice = wordsToPractice.slice(0, currentWordCount)
             }
           } else {
             // 全部词汇模式：使用所有单词（不过滤）
-            wordsToPractice = uniqueWords.slice(0, wordCount)
+            wordsToPractice = uniqueWords.slice(0, currentWordCount)
           }
 
+          statsRef.current = { correct: 0, incorrect: 0 }
+          setStats(statsRef.current)
           setWords(wordsToPractice)
+          setCurrentIndex(0)
           setStartTime(Date.now())
-          // 自动播放第一个单词并检查错词本状态
+
+          // 自动播放第一个单词（防止重复播放）
           const firstWord = wordsToPractice[0]
-          if (firstWord) {
+          if (firstWord && !hasSpokenRef.current) {
+            hasSpokenRef.current = true
             checkMistakeStatus(firstWord)
             setTimeout(() => {
               window.electronAPI.speak(firstWord).catch(() => {
-                // 原生 TTS 失败，使用 Web Speech API 作为备用
                 if ('speechSynthesis' in window) {
                   window.speechSynthesis.cancel()
                   const utterance = new SpeechSynthesisUtterance(firstWord)
                   const voices = window.speechSynthesis.getVoices()
-                  const voice = voices.find(v => v.name.includes('Samantha')) || 
-                               voices.find(v => v.lang.startsWith('en')) || 
+                  const voice = voices.find(v => v.name.includes('Samantha')) ||
+                               voices.find(v => v.lang.startsWith('en')) ||
                                voices[0]
                   if (voice) utterance.voice = voice
                   utterance.lang = 'en-US'
@@ -159,6 +192,75 @@ export function SpellingPracticePage() {
               })
             }, 500)
           }
+        }
+
+        if (savedProgress && savedProgress.currentIndex > 0 && savedProgress.currentIndex < savedProgress.wordCount) {
+          // 有未完成的进度，询问是否继续
+          const shouldContinue = confirm(`检测到您上次练习到第 ${savedProgress.currentIndex + 1} 个单词，是否继续练习？\n（选择"取消"将重新开始）`)
+          if (shouldContinue) {
+            // 恢复进度
+            startIndex = savedProgress.currentIndex
+            statsRef.current = {
+              correct: savedProgress.correctCount,
+              incorrect: savedProgress.incorrectCount
+            }
+            setStats(statsRef.current)
+            // 标记正在恢复进度，防止触发重新加载 effect
+            isRestoringProgressRef.current = true
+            // 只更新 ref，不触发 effect
+            wordCountRef.current = savedProgress.wordCount
+            practiceModeRef.current = savedProgress.practiceMode as PracticeMode
+            // 同时更新 state 以更新 UI
+            setWordCount(savedProgress.wordCount)
+            setPracticeMode(savedProgress.practiceMode as PracticeMode)
+            // 恢复后重置标志
+            setTimeout(() => {
+              isRestoringProgressRef.current = false
+            }, 100)
+            // 恢复单词列表 - 必须使用保存的列表，确保顺序一致
+            if (savedProgress.wordsList && savedProgress.wordsList.length > 0) {
+              wordsToPractice = savedProgress.wordsList
+            } else {
+              // 如果没有保存单词列表，无法准确恢复，提示用户重新开始
+              alert('无法恢复练习进度，将重新开始练习。')
+              await window.electronAPI.clearPracticeProgress(userName, articleId)
+              await initNewPractice()
+              return
+            }
+
+            setWords(wordsToPractice)
+            setCurrentIndex(startIndex)
+            setStartTime(Date.now())
+            // 播放当前单词并检查错词本状态（防止重复播放）
+            const currentWord = wordsToPractice[startIndex]
+            if (currentWord && !hasSpokenRef.current) {
+              hasSpokenRef.current = true
+              checkMistakeStatus(currentWord)
+              setTimeout(() => {
+                window.electronAPI.speak(currentWord).catch(() => {
+                  if ('speechSynthesis' in window) {
+                    window.speechSynthesis.cancel()
+                    const utterance = new SpeechSynthesisUtterance(currentWord)
+                    const voices = window.speechSynthesis.getVoices()
+                    const voice = voices.find(v => v.name.includes('Samantha')) ||
+                                 voices.find(v => v.lang.startsWith('en')) ||
+                                 voices[0]
+                    if (voice) utterance.voice = voice
+                    utterance.lang = 'en-US'
+                    utterance.rate = 0.9
+                    window.speechSynthesis.speak(utterance)
+                  }
+                })
+              }, 500)
+            }
+          } else {
+            // 用户选择重新开始，清除进度
+            await window.electronAPI.clearPracticeProgress(userName, articleId)
+            await initNewPractice()
+          }
+        } else {
+          // 没有保存的进度，开始新练习
+          await initNewPractice()
         }
       } catch (error) {
         console.error('Load article error:', error)
@@ -197,11 +299,13 @@ export function SpellingPracticePage() {
         loadArticle(parseInt(id))
       }
     }
-  }, [id, practiceMode, userName, checkMistakeStatus, wordCount, getBestEnglishVoice])
+  }, [id, userName, checkMistakeStatus, getBestEnglishVoice])
 
   // 当练习模式改变时，重新加载单词列表
   useEffect(() => {
     if (!article || !id) return
+    // 如果正在恢复进度，不重新加载
+    if (isRestoringProgressRef.current) return
 
     const reloadWords = async () => {
       try {
@@ -216,25 +320,31 @@ export function SpellingPracticePage() {
           .map((w: string) => w.toLowerCase())
         const uniqueWords = [...new Set<string>(extractedWords)]
 
+        // 使用 ref 读取当前值
+        const currentMode = practiceModeRef.current
+        const currentWordCount = wordCountRef.current
+
         // 根据练习模式获取需要练习的词汇列表
         let wordsToPractice: string[]
-        if (practiceMode === 'mistake') {
+        if (currentMode === 'mistake') {
           wordsToPractice = await window.electronAPI.getWordsToPractice(userName, articleId, uniqueWords)
           if (wordsToPractice.length === 0) {
             alert('恭喜！您已经掌握了这篇文章的所有词汇，将使用全部词汇进行练习。')
-            wordsToPractice = uniqueWords.slice(0, wordCount)
+            wordsToPractice = uniqueWords.slice(0, currentWordCount)
           } else {
             // 限制单词数量
-            wordsToPractice = wordsToPractice.slice(0, wordCount)
+            wordsToPractice = wordsToPractice.slice(0, currentWordCount)
           }
         } else {
-          wordsToPractice = uniqueWords.slice(0, wordCount)
+          wordsToPractice = uniqueWords.slice(0, currentWordCount)
         }
+        statsRef.current = { correct: 0, incorrect: 0 }
         setStats({ correct: 0, incorrect: 0 })
 
-        // 播放第一个单词
+        // 播放第一个单词（防止重复播放）
         const firstWord = wordsToPractice[0]
-        if (firstWord) {
+        if (firstWord && !hasSpokenRef.current) {
+          hasSpokenRef.current = true
           checkMistakeStatus(firstWord)
           setTimeout(() => {
             window.electronAPI.speak(firstWord).catch(() => {
@@ -262,7 +372,7 @@ export function SpellingPracticePage() {
     }
 
     reloadWords()
-  }, [practiceMode, wordCount, article, id, userName, checkMistakeStatus])
+  }, [article, id, userName, checkMistakeStatus])
 
   useEffect(() => {
     if (startTime > 0 && status !== 'completed') {
@@ -352,13 +462,19 @@ export function SpellingPracticePage() {
   }
 
   const checkAnswer = async () => {
+    if (words.length === 0 || currentIndex >= words.length) {
+      console.error('Invalid state:', { wordsLength: words.length, currentIndex })
+      return
+    }
+
     const currentWord = words[currentIndex]
     const isCorrect = userInput.trim().toLowerCase() === currentWord.toLowerCase()
     const articleId = parseInt(id || '0')
 
     if (isCorrect) {
       setStatus('correct')
-      setStats(prev => ({ ...prev, correct: prev.correct + 1 }))
+      statsRef.current.correct += 1
+      setStats({ ...statsRef.current })
 
       // 更新词汇掌握状态为已掌握
       try {
@@ -373,13 +489,28 @@ export function SpellingPracticePage() {
         console.error('Update progress error:', error)
       }
 
-      setTimeout(() => {
+      setTimeout(async () => {
         if (currentIndex < words.length - 1) {
           const nextIndex = currentIndex + 1
           setCurrentIndex(nextIndex)
           setUserInput('')
           setStatus('idle')
           setShowAnswer(false)
+
+          // 保存练习进度
+          try {
+            await window.electronAPI.savePracticeProgress(userName, articleId, {
+              currentIndex: nextIndex,
+              correctCount: statsRef.current.correct,
+              incorrectCount: statsRef.current.incorrect,
+              wordCount,
+              practiceMode,
+              wordsList: words
+            })
+          } catch (error) {
+            console.error('Save practice progress error:', error)
+          }
+
           speakWord(words[nextIndex]).catch(console.error)
           // 检查下一个单词是否在错词本中
           checkMistakeStatus(words[nextIndex])
@@ -389,7 +520,8 @@ export function SpellingPracticePage() {
       }, 800)
     } else {
       setStatus('incorrect')
-      setStats(prev => ({ ...prev, incorrect: prev.incorrect + 1 }))
+      statsRef.current.incorrect += 1
+      setStats({ ...statsRef.current })
       setShowAnswer(true)
 
       // 更新词汇掌握状态为未掌握
@@ -399,6 +531,20 @@ export function SpellingPracticePage() {
         // 添加到错词本
         await window.electronAPI.addMistakeWord(userName, currentWord, articleId)
         setIsInMistakeList(true)
+
+        // 保存练习进度（即使答错也保存当前进度）
+        try {
+          await window.electronAPI.savePracticeProgress(userName, articleId, {
+            currentIndex,
+            correctCount: statsRef.current.correct,
+            incorrectCount: statsRef.current.incorrect,
+            wordCount,
+            practiceMode,
+            wordsList: words
+          })
+        } catch (progressError) {
+          console.error('Save practice progress error:', progressError)
+        }
       } catch (error) {
         console.error('Add mistake word error:', error)
       }
@@ -409,8 +555,8 @@ export function SpellingPracticePage() {
     setStatus('completed')
     if (timerRef.current) clearInterval(timerRef.current)
 
-    const totalWords = stats.correct + stats.incorrect + 1
-    const accuracy = Math.round((stats.correct + 1) / totalWords * 100)
+    const totalWords = statsRef.current.correct + statsRef.current.incorrect
+    const accuracy = Math.round((statsRef.current.correct / totalWords) * 100)
     const duration = Math.floor((Date.now() - startTime) / 1000)
     const wpm = Math.round((totalWords / duration) * 60)
     const score = Math.round((accuracy * wpm) / 10)
@@ -428,6 +574,8 @@ export function SpellingPracticePage() {
       }
       try {
         await window.electronAPI.savePracticeRecord(record)
+        // 练习完成，清除进度
+        await window.electronAPI.clearPracticeProgress(userName, article.id ?? 0)
       } catch (error) {
         console.error('Save record error:', error)
       }
@@ -448,13 +596,17 @@ export function SpellingPracticePage() {
   const currentAccuracy = totalAnswered > 0 ? Math.round(stats.correct / totalAnswered * 100) : 100
   const wpm = elapsedTime > 0 ? Math.round((totalAnswered / elapsedTime) * 60) : 0
 
+  if (!id) {
+    return <div style={styles.loading}>错误：未指定文章ID</div>
+  }
+
   if (isLoading || !article) {
     return <div style={styles.loading}>加载中...</div>
   }
 
   if (status === 'completed') {
     const totalWords = words.length
-    const finalAccuracy = Math.round(stats.correct / totalWords * 100)
+    const finalAccuracy = Math.round((statsRef.current.correct / totalWords) * 100)
     const finalScore = Math.round((finalAccuracy * wpm) / 10)
 
     return (
