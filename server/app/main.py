@@ -61,6 +61,12 @@ app.add_middleware(
 )
 
 
+@app.get("/health")
+async def health_check_simple():
+    """健康检查（Railway）"""
+    return {"status": "ok"}
+
+
 @app.get("/api/health", response_model=HealthResponse)
 async def health_check():
     """健康检查"""
