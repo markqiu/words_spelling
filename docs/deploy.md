@@ -54,110 +54,48 @@ cd server
 uv run gunicorn app.main:app -w 4 -k uvicorn.workers.UvicornWorker -b 0.0.0.0:8000
 ```
 
-### 5. Docker 部署（推荐）
+### 5. Railway 部署（推荐用于云端）
 
-在 `server/` 目录下创建 `Dockerfile`:
+Railway 是一个简单易用的 PaaS 平台，使用 [Railpack](https://railpack.com/) 自动构建和部署。
 
-```dockerfile
-FROM python:3.11-slim
+**Railpack 自动检测：**
+- 检测 `pyproject.toml` + `uv.lock` → 使用 uv 包管理器
+- 检测 `fastapi` 依赖 → 自动配置 FastAPI 启动命令
+- 项目已包含 `railpack.json` 配置正确的启动命令
 
-WORKDIR /app
-
-# 安装 uv
-RUN pip install uv
-
-# 复制依赖文件
-COPY pyproject.toml uv.lock ./
-
-# 安装依赖
-RUN uv sync --frozen
-
-# 复制应用代码
-COPY . .
-
-# 下载 spaCy 模型
-RUN uv run python -m spacy download en_core_web_sm
-
-EXPOSE 8000
-
-CMD ["uv", "run", "uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
-```
-
-构建并运行：
-```bash
-cd server
-docker build -t spelling-server .
-docker run -d -p 8000:8000 spelling-server
-```
-
-### 6. Railway 部署（推荐用于云端）
-
-Railway 是一个简单易用的 PaaS 平台，支持自动构建和部署。
-
-**方式一：GitHub 集成（推荐）**
+**GitHub 集成部署：**
 
 1. 在 [Railway](https://railway.app) 创建账号
 2. 点击 "New Project" → "Deploy from GitHub repo"
 3. 选择 `words_spelling` 仓库
 4. 在项目设置中，设置 **Root Directory** 为 `server`
-5. Railway 会自动检测 `Dockerfile` 并开始部署
+5. Railway 会自动检测并开始部署
 
-**方式二：CLI 部署**
-
-```bash
-# 安装 Railway CLI
-npm install -g @railway/cli
-
-# 登录
-railway login
-
-# 在 server 目录下初始化
-cd server
-railway init
-
-# 部署
-railway up
-```
-
-**环境变量配置**
-
-在 Railway Dashboard → Variables 中添加：
+**环境变量配置：**
 
 | 变量名 | 说明 | 必需 |
 |--------|------|------|
 | `PORT` | 服务端口 | 自动设置 |
-| `SPACY_MODEL` | spaCy 模型 | 否（默认 en_core_web_sm） |
+| `SPACY_MODEL` | spaCy 模型 | 否 |
 | `OPENAI_API_KEY` | OpenAI API Key | 否 |
 
-**部署后验证**
+**部署后验证：**
+```bash
+curl https://your-app.railway.app/health
+```
+
+### 6. Docker 部署（可选）
+
+如需自定义 Docker 构建：
 
 ```bash
-# 健康检查
-curl https://your-app.railway.app/health
-
-# 测试分词
-curl -X POST https://your-app.railway.app/api/segment \
-  -H "Content-Type: application/json" \
-  -d '{"text": "Hello world", "mode": "word"}'
+cd server
+# 创建 Dockerfile 后
+docker build -t spelling-server .
+docker run -d -p 8000:8000 spelling-server
 ```
 
-**Railway 配置文件**
-
-项目已包含 `server/railway.toml` 配置文件：
-```toml
-[build]
-builder = "DOCKERFILE"
-dockerfilePath = "Dockerfile"
-
-[deploy]
-startCommand = "uv run uvicorn app.main:app --host 0.0.0.0 --port $PORT"
-healthcheckPath = "/health"
-healthcheckTimeout = 30
-restartPolicyType = "ON_FAILURE"
-restartPolicyMaxRetries = 3
-```
-
-### 7. Systemd 服务（Linux）
+### 6. Systemd 服务（Linux）
 
 创建 `/etc/systemd/system/spelling-server.service`:
 
