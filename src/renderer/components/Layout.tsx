@@ -7,7 +7,6 @@ export function Layout() {
   const navItems = [
     { path: '/', label: '首页', icon: '🏠' },
     { path: '/articles', label: '文章库', icon: '📚' },
-    { path: '/crawl', label: '爬取文章', icon: '🕷️' },
     { path: '/leaderboard', label: '排行榜', icon: '🏆' },
   ]
 
