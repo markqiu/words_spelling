@@ -23,7 +23,10 @@ struct ServerSegmentResponse {
 #[tauri::command]
 pub async fn segment_text(request: SegmentRequest) -> Result<SegmentResponse, String> {
     let server_url = request.server_url.unwrap_or_else(|| {
-        "http://localhost:8000".to_string()
+        // 默认使用生产服务器地址
+        option_env!("SEGMENT_SERVER_URL")
+            .unwrap_or("https://wordsspelling-production.up.railway.app")
+            .to_string()
     });
     
     let client = Client::builder()

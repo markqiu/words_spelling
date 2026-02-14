@@ -22,15 +22,19 @@ if ! command -v rustc &> /dev/null; then
     exit 1
 fi
 
+# 默认使用生产服务器
+DEFAULT_SERVER="https://wordsspelling-production.up.railway.app"
+
 # 询问服务器地址
-read -p "请输入分词服务器地址 (默认: http://localhost:8000): " SERVER_URL
-SERVER_URL=${SERVER_URL:-http://localhost:8000}
+read -p "请输入分词服务器地址 (默认: $DEFAULT_SERVER): " SERVER_URL
+SERVER_URL=${SERVER_URL:-$DEFAULT_SERVER}
 
 echo ""
 echo "📡 服务器地址: $SERVER_URL"
 echo ""
 
 # 设置环境变量
+export SEGMENT_SERVER_URL=$SERVER_URL
 export VITE_SEGMENT_API_URL=$SERVER_URL
 
 # 安装依赖

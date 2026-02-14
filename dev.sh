@@ -9,6 +9,11 @@ echo "  单词拼写练习 - 开发环境"
 echo "================================"
 echo ""
 
+# 设置使用本地服务器
+export SEGMENT_SERVER_URL="http://localhost:8000"
+echo "📡 使用本地服务器: $SEGMENT_SERVER_URL"
+echo ""
+
 # 检查 Python 服务器
 if ! lsof -i:8000 > /dev/null 2>&1; then
     echo "⚠️  Python 服务器未运行在端口 8000"
