@@ -1,32 +1,31 @@
 import { useEffect, useState, useCallback } from 'react'
 import { Link } from 'react-router-dom'
-import type { Article } from '../../types'
+import * as api from '../utils/api'
 import './ArticlesPage.css'
 
-const categories = [
-  { value: 'all', label: '全部', icon: '📚' },
-  { value: 'novel', label: '小说', icon: '📖' },
-  { value: 'news', label: '新闻', icon: '📰' },
-  { value: 'story', label: '故事', icon: '📜' },
-  { value: 'biography', label: '传记', icon: '👤' },
-  { value: 'technical', label: '专业', icon: '🔬' },
-  { value: 'other', label: '其他', icon: '📁' },
-]
-
 export function ArticlesPage() {
-  const [articles, setArticles] = useState<Article[]>([])
-  const [filteredArticles, setFilteredArticles] = useState<Article[]>([])
-  const [selectedCategory, setSelectedCategory] = useState('all')
+  const [articles, setArticles] = useState<api.Article[]>([])
   const [searchQuery, setSearchQuery] = useState('')
   const [isLoading, setIsLoading] = useState(true)
   const [userName, setUserName] = useState('练习者')
+  const [segmentStatus, setSegmentStatus] = useState<Record<number, Record<string, boolean>>>({})
 
   const loadArticles = useCallback(async () => {
     try {
       setIsLoading(true)
-      const data = await window.electronAPI.getArticles()
+      const data = await api.getArticles()
       setArticles(data)
-      setFilteredArticles(data)
+      
+      // 检查每篇文章的分词状态
+      const status: Record<number, Record<string, boolean>> = {}
+      for (const article of data) {
+        status[article.id] = {
+          word: false,
+          phrase: false,
+          sentence: false
+        }
+      }
+      setSegmentStatus(status)
     } catch (error) {
       console.error('Error loading articles:', error)
     } finally {
@@ -39,45 +38,30 @@ export function ArticlesPage() {
   }, [loadArticles])
 
   useEffect(() => {
-    let filtered = articles
+    localStorage.setItem('userName', userName)
+  }, [userName])
 
-    if (selectedCategory !== 'all') {
-      filtered = filtered.filter(a => a.category === selectedCategory)
-    }
+  useEffect(() => {
+    const saved = localStorage.getItem('userName')
+    if (saved) setUserName(saved)
+  }, [])
 
-    if (searchQuery) {
-      const query = searchQuery.toLowerCase()
-      filtered = filtered.filter(a =>
-        a.title.toLowerCase().includes(query) ||
-        a.content.toLowerCase().includes(query)
-      )
-    }
-
-    setFilteredArticles(filtered)
-  }, [selectedCategory, searchQuery, articles])
+  const filteredArticles = articles.filter(a =>
+    a.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
+    a.content.toLowerCase().includes(searchQuery.toLowerCase())
+  )
 
   const handleDelete = async (id: number) => {
     if (!confirm('确定要删除这篇文章吗？')) return
 
     try {
-      await window.electronAPI.deleteArticle(id)
+      await api.deleteArticle(id)
       loadArticles()
     } catch (error) {
       console.error('Error deleting article:', error)
+      alert('删除失败')
     }
   }
-
-  // 文件导入功能（预留）
-  // const handleImport = async () => {
-  //   try {
-  //     const filePath = await window.electronAPI.importArticle()
-  //     if (filePath) {
-  //       alert(`已选择文件: ${filePath}`)
-  //     }
-  //   } catch (error) {
-  //     console.error('Import error:', error)
-  //   }
-  // }
 
   if (isLoading) {
     return <div className="loading">加载中...</div>
@@ -96,24 +80,10 @@ export function ArticlesPage() {
               onChange={(e) => setSearchQuery(e.target.value)}
             />
           </div>
-          <Link to="/crawl" className="btn btn-primary">
-            爬取文章
+          <Link to="/edit/new" className="btn btn-primary">
+            录入文章
           </Link>
         </div>
-      </div>
-
-      <div className="category-filter">
-        {categories.map(cat => (
-          <button
-            key={cat.value}
-            className={`category-btn ${selectedCategory === cat.value ? 'active' : ''}`}
-            onClick={() => setSelectedCategory(cat.value)}
-            type="button"
-          >
-            <span className="category-icon">{cat.icon}</span>
-            <span>{cat.label}</span>
-          </button>
-        ))}
       </div>
 
       <div className="user-name-input">
@@ -131,8 +101,8 @@ export function ArticlesPage() {
           <div className="empty-state">
             <div className="empty-icon">📭</div>
             <p>暂无文章</p>
-            <Link to="/crawl" className="btn btn-primary">
-              去爬取文章
+            <Link to="/edit/new" className="btn btn-primary">
+              录入第一篇文章
             </Link>
           </div>
         ) : (
@@ -140,9 +110,6 @@ export function ArticlesPage() {
             <div key={article.id} className="article-card">
               <div className="article-header">
                 <h3 className="article-title">{article.title}</h3>
-                <span className={`category-badge ${article.category}`}>
-                  {getCategoryLabel(article.category)}
-                </span>
               </div>
 
               <p className="article-preview">
@@ -151,50 +118,55 @@ export function ArticlesPage() {
 
               <div className="article-meta">
                 <span className="meta-item">
-                  <span className="meta-icon">📝</span>
-                  {article.wordCount} 词
-                </span>
-                <span className={`meta-item difficulty ${article.difficulty}`}>
-                  {getDifficultyLabel(article.difficulty)}
-                </span>
-                <span className="meta-item">
                   <span className="meta-icon">📅</span>
-                  {formatDate(article.createdAt)}
+                  {formatDate(article.created_at)}
+                </span>
+              </div>
+
+              <div className="segment-status">
+                <span className={`status-badge ${segmentStatus[article.id]?.word ? 'ready' : ''}`}>
+                  单词 {segmentStatus[article.id]?.word ? '✓' : '○'}
+                </span>
+                <span className={`status-badge ${segmentStatus[article.id]?.phrase ? 'ready' : ''}`}>
+                  短语 {segmentStatus[article.id]?.phrase ? '✓' : '○'}
+                </span>
+                <span className={`status-badge ${segmentStatus[article.id]?.sentence ? 'ready' : ''}`}>
+                  短句 {segmentStatus[article.id]?.sentence ? '✓' : '○'}
                 </span>
               </div>
 
               <div className="article-actions">
                 <Link
-                  to={`/spelling/${article.id}`}
+                  to={`/practice/${article.id}/word`}
                   className="btn btn-primary"
                   state={{ userName }}
                 >
-                  拼写练习
+                  单词听写
                 </Link>
                 <Link
-                  to={`/phrase/${article.id}`}
+                  to={`/practice/${article.id}/phrase`}
                   className="btn btn-success"
                   state={{ userName }}
                 >
                   短语听写
                 </Link>
                 <Link
-                  to={`/typing/${article.id}`}
+                  to={`/practice/${article.id}/sentence`}
                   className="btn btn-secondary"
                   state={{ userName }}
                 >
-                  背诵练习
+                  短句听写
                 </Link>
                 <Link
-                  to={`/edit/${article.id}`}
-                  className="btn btn-warning btn-icon"
-                  title="编辑"
+                  to={`/segment/${article.id}`}
+                  className="btn btn-warning"
+                  state={{ userName }}
                 >
-                  ✏️
+                  分词
                 </Link>
                 <button
                   className="btn btn-error btn-icon"
-                  onClick={() => article.id !== undefined && handleDelete(article.id)}
+                  onClick={() => handleDelete(article.id)}
                   title="删除"
                   type="button"
                 >
@@ -209,28 +181,6 @@ export function ArticlesPage() {
   )
 }
 
-function getCategoryLabel(category: string): string {
-  const labels: Record<string, string> = {
-    novel: '小说',
-    news: '新闻',
-    story: '故事',
-    biography: '传记',
-    technical: '专业',
-    other: '其他'
-  }
-  return labels[category] || category
-}
-
-function getDifficultyLabel(difficulty: string): string {
-  const labels: Record<string, string> = {
-    easy: '简单',
-    medium: '中等',
-    hard: '困难'
-  }
-  return labels[difficulty] || difficulty
-}
-
-function formatDate(dateString: string | undefined): string {
-  if (!dateString) return '未知'
+function formatDate(dateString: string): string {
   return new Date(dateString).toLocaleDateString('zh-CN')
 }

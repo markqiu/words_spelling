@@ -1,0 +1,32 @@
+[package]
+name = "spelling-game"
+version = "2.0.0"
+description = "单词拼写与打字练习软件"
+authors = ["Spelling Game Team"]
+edition = "2021"
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[dependencies]
+tauri = { version = "2", features = ["devtools"] }
+tauri-plugin-shell = "2"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+rusqlite = { version = "0.32", features = ["bundled"] }
+tokio = { version = "1", features = ["rt-multi-thread", "macros"] }
+chrono = { version = "0.4", features = ["serde"] }
+uuid = { version = "1", features = ["v4"] }
+log = "0.4"
+env_logger = "0.11"
+reqwest = { version = "0.12", features = ["json"] }
+
+[target.'cfg(target_os = "macos")'.dependencies]
+cocoa = "0.26"
+
+[profile.release]
+panic = "abort"
+codegen-units = 1
+lto = true
+opt-level = "z"
+strip = true

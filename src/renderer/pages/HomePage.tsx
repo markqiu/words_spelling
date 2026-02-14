@@ -1,43 +1,42 @@
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
-import type { Article, PracticeRecord } from '../../types'
+import * as api from '../utils/api'
 import './HomePage.css'
 
 export function HomePage() {
-  const [recentArticles, setRecentArticles] = useState<Article[]>([])
+  const [recentArticles, setRecentArticles] = useState<api.Article[]>([])
   const [stats, setStats] = useState({
     totalArticles: 0,
     totalPractices: 0,
-    avgAccuracy: 0,
-    avgWpm: 0
+    avgAccuracy: 0
   })
   const [userName] = useState('练习者')
-  const [isInitializing, setIsInitializing] = useState(false)
 
   useEffect(() => {
     loadData()
+    
+    // 从 localStorage 读取用户名
+    const saved = localStorage.getItem('userName')
+    if (saved) {
+      // 这里不设置 userName 因为它是 const，需要在 ArticlesPage 设置
+    }
   }, [])
 
   const loadData = async () => {
     try {
-      // 初始化默认文章
-      await window.electronAPI.initializeDefaultArticles()
-
       // 加载文章
-      const articles = await window.electronAPI.getArticles()
+      const articles = await api.getArticles()
       setRecentArticles(articles.slice(0, 5))
       setStats(prev => ({ ...prev, totalArticles: articles.length }))
 
-      // 加载练习记录
-      const records = await window.electronAPI.getPracticeRecords(userName)
-      if (records.length > 0) {
-        const totalAccuracy = records.reduce((sum: number, r: PracticeRecord) => sum + r.accuracy, 0)
-        const totalWpm = records.reduce((sum: number, r: PracticeRecord) => sum + r.wpm, 0)
+      // 加载排行榜统计
+      const leaderboard = await api.getLeaderboard(undefined, undefined, 100)
+      if (leaderboard.length > 0) {
+        const totalAccuracy = leaderboard.reduce((sum, r) => sum + r.accuracy, 0)
         setStats({
           totalArticles: articles.length,
-          totalPractices: records.length,
-          avgAccuracy: Math.round((totalAccuracy / records.length) * 100) / 100,
-          avgWpm: Math.round(totalWpm / records.length)
+          totalPractices: leaderboard.length,
+          avgAccuracy: Math.round((totalAccuracy / leaderboard.length) * 100) / 100
         })
       }
     } catch (error) {
@@ -45,28 +44,10 @@ export function HomePage() {
     }
   }
 
-  const handleInitialize = async () => {
-    setIsInitializing(true)
-    try {
-      const result = await window.electronAPI.initializeDefaultArticles()
-      if (result) {
-        alert('默认文章库已初始化！')
-        loadData()
-      } else {
-        alert('文章库已存在，无需重复初始化。')
-      }
-    } catch (error) {
-      console.error('Initialize error:', error)
-      alert('初始化失败')
-    } finally {
-      setIsInitializing(false)
-    }
-  }
-
   return (
     <div className="home-page">
       <div className="page-header">
-        <h1>欢迎来到单词拼写练习</h1>
+        <h1>单词拼写练习</h1>
         <p className="subtitle">提升你的英语拼写和打字技能</p>
       </div>
 
@@ -84,32 +65,27 @@ export function HomePage() {
         <div className="stat-card">
           <div className="stat-icon">✅</div>
           <div className="stat-value">{stats.avgAccuracy}%</div>
-          <div className="stat-label">平均准确率</div>
-        </div>
-        <div className="stat-card">
-          <div className="stat-icon">⚡</div>
-          <div className="stat-value">{stats.avgWpm}</div>
-          <div className="stat-label">平均速度 (WPM)</div>
+          <div className="stat-label">平均正确率</div>
         </div>
       </div>
 
       <div className="quick-actions">
         <h2>快速开始</h2>
         <div className="action-cards">
-          <Link to="/articles" className="action-card">
+          <Link to="/edit/new" className="action-card primary">
             <div className="action-icon">📝</div>
-            <div className="action-title">选择文章练习</div>
-            <div className="action-desc">从文章库中选择一篇文章开始练习</div>
+            <div className="action-title">录入文章</div>
+            <div className="action-desc">粘贴或输入英文文章，AI 智能分词</div>
           </Link>
-          <Link to="/crawl" className="action-card">
-            <div className="action-icon">🕷️</div>
-            <div className="action-title">爬取新文章</div>
-            <div className="action-desc">从网络爬取新的文章添加到库中</div>
+          <Link to="/articles" className="action-card">
+            <div className="action-icon">📖</div>
+            <div className="action-title">开始听写</div>
+            <div className="action-desc">选择文章进行单词、短语或短句听写</div>
           </Link>
           <Link to="/leaderboard" className="action-card">
             <div className="action-icon">🏆</div>
-            <div className="action-title">查看排行榜</div>
-            <div className="action-desc">查看练习成绩排行榜</div>
+            <div className="action-title">排行榜</div>
+            <div className="action-desc">查看练习成绩排行</div>
           </Link>
         </div>
       </div>
@@ -123,67 +99,29 @@ export function HomePage() {
                 <div className="article-info">
                   <div className="article-title">{article.title}</div>
                   <div className="article-meta">
-                    <span className={`category-tag ${article.category}`}>
-                      {getCategoryLabel(article.category)}
-                    </span>
-                    <span className="word-count">{article.wordCount} 词</span>
-                    <span className={`difficulty-badge ${article.difficulty}`}>
-                      {getDifficultyLabel(article.difficulty)}
-                    </span>
+                    <span className="date">{formatDate(article.created_at)}</span>
                   </div>
                 </div>
                 <div className="article-actions">
-                  {article.id && (
-                    <>
-                      <Link to={`/spelling/${article.id}`} className="btn btn-primary btn-sm">
-                        拼写练习
-                      </Link>
-                      <Link to={`/phrase/${article.id}`} className="btn btn-success btn-sm">
-                        短语听写
-                      </Link>
-                      <Link to={`/typing/${article.id}`} className="btn btn-secondary btn-sm">
-                        背诵练习
-                      </Link>
-                    </>
-                  )}
+                  <Link to={`/practice/${article.id}/word`} className="btn btn-primary btn-sm" state={{ userName }}>
+                    单词
+                  </Link>
+                  <Link to={`/practice/${article.id}/phrase`} className="btn btn-success btn-sm" state={{ userName }}>
+                    短语
+                  </Link>
+                  <Link to={`/practice/${article.id}/sentence`} className="btn btn-secondary btn-sm" state={{ userName }}>
+                    短句
+                  </Link>
                 </div>
               </div>
             ))}
           </div>
         </div>
       )}
-
-      <div className="init-section">
-        <button
-          type="button"
-          className="btn btn-secondary"
-          onClick={handleInitialize}
-          disabled={isInitializing}
-        >
-          {isInitializing ? '初始化中...' : '重置默认文章库'}
-        </button>
-      </div>
     </div>
   )
 }
 
-function getCategoryLabel(category: string): string {
-  const labels: Record<string, string> = {
-    novel: '小说',
-    news: '新闻',
-    story: '故事',
-    biography: '传记',
-    technical: '专业',
-    other: '其他'
-  }
-  return labels[category] || category
-}
-
-function getDifficultyLabel(difficulty: string): string {
-  const labels: Record<string, string> = {
-    easy: '简单',
-    medium: '中等',
-    hard: '困难'
-  }
-  return labels[difficulty] || difficulty
+function formatDate(dateString: string): string {
+  return new Date(dateString).toLocaleDateString('zh-CN')
 }

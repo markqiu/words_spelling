@@ -1,87 +1,38 @@
 {
   "name": "spelling-game",
-  "version": "1.2.0",
-  "description": "单词拼写与打字练习软件",
-  "main": "dist-electron/main/main.js",
+  "version": "2.0.0",
+  "description": "单词拼写与打字练习软件 - Tauri 版本",
   "scripts": {
-    "dev": "concurrently \"vite\" \"npm run electron:dev\"",
-    "electron:dev": "wait-on http://localhost:5173 && electron dist-electron/main/main.js",
-    "build": "tsc && vite build && electron-builder",
-    "build:mac": "tsc && vite build && electron-builder --mac",
-    "build:win": "tsc && vite build && electron-builder --win",
+    "dev:frontend": "vite",
+    "build:frontend": "tsc && vite build",
     "preview": "vite preview",
-    "postinstall": "electron-builder install-app-deps"
+    "tauri": "tauri",
+    "dev": "tauri dev",
+    "build": "tauri build",
+    "build:mac": "tauri build --target universal-apple-darwin"
   },
   "keywords": [
     "spelling",
     "typing",
     "education",
-    "electron"
+    "tauri"
   ],
   "author": "Spelling Game Team",
   "license": "MIT",
-  "type": "commonjs",
   "devDependencies": {
-    "@types/better-sqlite3": "^7.6.13",
+    "@tauri-apps/cli": "^2",
     "@types/node": "^25.2.0",
     "@types/react": "^19.2.10",
     "@types/react-dom": "^19.2.3",
     "@vitejs/plugin-react": "^5.1.3",
-    "concurrently": "^9.2.1",
-    "electron": "^40.1.0",
-    "electron-builder": "^26.7.0",
     "typescript": "^5.9.3",
-    "vite": "^7.3.1",
-    "wait-on": "^9.0.3"
+    "vite": "^7.3.1"
   },
   "dependencies": {
-    "axios": "^1.13.4",
-    "better-sqlite3": "^12.6.2",
-    "cheerio": "^1.2.0",
-    "compromise": "^14.14.5",
+    "@tauri-apps/api": "^2",
+    "@tauri-apps/plugin-shell": "^2",
     "react": "^19.2.4",
     "react-dom": "^19.2.4",
-    "react-router-dom": "^7.13.0",
-    "say": "^0.16.0"
-  },
-  "build": {
-    "appId": "com.spellinggame.app",
-    "productName": "单词拼写练习",
-    "directories": {
-      "output": "release"
-    },
-    "files": [
-      "dist/**/*",
-      "dist-electron/**/*",
-      "resources/**/*"
-    ],
-    "extraResources": [
-      {
-        "from": "resources/",
-        "to": "resources/"
-      }
-    ],
-    "mac": {
-      "target": [
-        {
-          "target": "dmg",
-          "arch": [
-            "x64",
-            "arm64"
-          ]
-        }
-      ],
-      "category": "public.app-category.education"
-    },
-    "win": {
-      "target": [
-        {
-          "target": "nsis",
-          "arch": [
-            "x64"
-          ]
-        }
-      ]
-    }
+    "react-router-dom": "^7.13.0"
   }
 }

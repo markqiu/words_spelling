@@ -1,0 +1,352 @@
+.practice-page {
+  padding: 20px;
+  max-width: 800px;
+  margin: 0 auto;
+}
+
+.practice-page.completed {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  min-height: 60vh;
+}
+
+.practice-page.settings {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  min-height: 60vh;
+}
+
+.completion-card,
+.settings-card {
+  background: white;
+  border-radius: 16px;
+  padding: 40px;
+  text-align: center;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
+}
+
+.completion-card h1 {
+  margin-bottom: 30px;
+  color: #2d3748;
+}
+
+.settings-card h1 {
+  color: #4a5568;
+  margin-bottom: 10px;
+}
+
+.settings-card h2 {
+  color: #718096;
+  font-size: 1.1rem;
+  font-weight: normal;
+  margin-bottom: 20px;
+}
+
+.segment-count {
+  color: #a0aec0;
+  margin-bottom: 30px;
+}
+
+.stats-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 20px;
+  margin-bottom: 30px;
+}
+
+.stat-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.stat-value {
+  font-size: 2.5rem;
+  font-weight: bold;
+  color: #4a5568;
+}
+
+.stat-label {
+  color: #a0aec0;
+  margin-top: 5px;
+}
+
+.settings-form {
+  margin-bottom: 30px;
+}
+
+.settings-form .form-group {
+  margin-bottom: 20px;
+}
+
+.settings-form label {
+  display: block;
+  margin-bottom: 8px;
+  color: #4a5568;
+  font-weight: 500;
+}
+
+.settings-form select {
+  width: 100%;
+  padding: 12px;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  font-size: 1rem;
+}
+
+.completion-actions,
+.settings-actions {
+  display: flex;
+  gap: 15px;
+  justify-content: center;
+  flex-wrap: wrap;
+}
+
+.practice-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 30px;
+  padding-bottom: 20px;
+  border-bottom: 1px solid #e2e8f0;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.practice-header h1 {
+  color: #2d3748;
+  margin: 0;
+}
+
+.progress-info {
+  display: flex;
+  gap: 20px;
+  color: #718096;
+}
+
+.progress-info .stats {
+  color: #a0aec0;
+}
+
+.keyboard-hints {
+  display: flex;
+  gap: 15px;
+  font-size: 12px;
+  color: #a0aec0;
+}
+
+.keyboard-hints .hint {
+  background: #f7fafc;
+  padding: 4px 10px;
+  border-radius: 4px;
+  border: 1px solid #e2e8f0;
+}
+
+.practice-content {
+  background: white;
+  border-radius: 16px;
+  padding: 30px;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.05);
+}
+
+.audio-section {
+  text-align: center;
+  margin-bottom: 30px;
+}
+
+.btn-play {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: white;
+  border: none;
+  padding: 15px 30px;
+  border-radius: 50px;
+  font-size: 1.1rem;
+  cursor: pointer;
+  transition: transform 0.2s, box-shadow 0.2s;
+}
+
+.btn-play:hover:not(:disabled) {
+  transform: scale(1.05);
+  box-shadow: 0 4px 15px rgba(102, 126, 234, 0.4);
+}
+
+.btn-play:disabled {
+  opacity: 0.7;
+  cursor: not-allowed;
+}
+
+.input-section {
+  display: flex;
+  gap: 15px;
+  margin-bottom: 20px;
+}
+
+.input-section input {
+  flex: 1;
+  padding: 15px 20px;
+  border: 2px solid #e2e8f0;
+  border-radius: 10px;
+  font-size: 1.1rem;
+  transition: border-color 0.2s;
+}
+
+.input-section input:focus {
+  outline: none;
+  border-color: #667eea;
+}
+
+.input-section input:disabled,
+.input-section input[readonly] {
+  background: #f7fafc;
+  color: #718096;
+}
+
+.result-section {
+  padding: 20px;
+  border-radius: 10px;
+  text-align: center;
+}
+
+.result-section.correct {
+  background: #c6f6d5;
+  color: #276749;
+}
+
+.result-section.incorrect {
+  background: #fed7d7;
+  color: #c53030;
+}
+
+.result-status {
+  font-size: 1.2rem;
+  font-weight: bold;
+  margin-bottom: 10px;
+}
+
+.correct-answer {
+  color: #4a5568;
+}
+
+.correct-answer strong {
+  color: #2d3748;
+}
+
+/* 通用按钮样式 */
+.btn {
+  padding: 12px 24px;
+  border-radius: 8px;
+  font-size: 1rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s;
+  border: none;
+}
+
+.btn-primary {
+  background: #667eea;
+  color: white;
+}
+
+.btn-primary:hover:not(:disabled) {
+  background: #5a67d8;
+}
+
+.btn-success {
+  background: #48bb78;
+  color: white;
+}
+
+.btn-success:hover:not(:disabled) {
+  background: #38a169;
+}
+
+.btn-secondary {
+  background: #e2e8f0;
+  color: #4a5568;
+}
+
+.btn-secondary:hover:not(:disabled) {
+  background: #cbd5e0;
+}
+
+.btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+/* 差异对比显示 */
+.diff-comparison {
+  margin-top: 15px;
+  text-align: left;
+}
+
+.diff-row {
+  display: flex;
+  align-items: flex-start;
+  margin-bottom: 10px;
+  gap: 10px;
+}
+
+.diff-label {
+  color: #718096;
+  font-size: 14px;
+  min-width: 80px;
+  flex-shrink: 0;
+}
+
+.diff-text {
+  font-family: 'Monaco', 'Menlo', 'Consolas', monospace;
+  font-size: 18px;
+  letter-spacing: 2px;
+  line-height: 1.8;
+  background: #f7fafc;
+  padding: 8px 12px;
+  border-radius: 6px;
+  word-break: break-all;
+}
+
+.diff-text.user {
+  border: 1px solid #fed7d7;
+}
+
+.diff-text.answer {
+  border: 1px solid #c6f6d5;
+}
+
+.diff-char {
+  display: inline-block;
+  padding: 2px 1px;
+  border-radius: 2px;
+  transition: background 0.2s;
+}
+
+/* 正确字符 - 绿色 */
+.diff-char.correct {
+  background: transparent;
+  color: inherit;
+}
+
+/* 错误字符 - 红色背景 */
+.diff-char.wrong {
+  background: #feb2b2;
+  color: #c53030;
+  font-weight: bold;
+}
+
+/* 缺少的字符 - 黄色下划线 */
+.diff-char.missing {
+  background: #faf089;
+  color: #975a16;
+  text-decoration: underline;
+  text-decoration-style: wavy;
+  text-decoration-color: #d69e2e;
+}
+
+/* 多余的字符 - 灰色删除线 */
+.diff-char.extra {
+  background: #e2e8f0;
+  color: #a0aec0;
+  text-decoration: line-through;
+}

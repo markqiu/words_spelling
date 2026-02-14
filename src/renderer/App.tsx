@@ -2,11 +2,8 @@ import { Routes, Route } from 'react-router-dom'
 import { Layout } from './components/Layout'
 import { HomePage } from './pages/HomePage'
 import { ArticlesPage } from './pages/ArticlesPage'
-import { CrawlPage } from './pages/CrawlPage'
 import { EditArticlePage } from './pages/EditArticlePage'
-import { PhrasePracticePage } from './pages/PhrasePracticePage'
-import { SpellingPracticePage } from './pages/SpellingPracticePage'
-import { TypingPracticePage } from './pages/TypingPracticePage'
+import { PracticePage } from './pages/PracticePage'
 import { LeaderboardPage } from './pages/LeaderboardPage'
 import './styles/App.css'
 
@@ -17,11 +14,9 @@ function App() {
         <Route path="/" element={<Layout />}>
           <Route index element={<HomePage />} />
           <Route path="articles" element={<ArticlesPage />} />
-          <Route path="crawl" element={<CrawlPage />} />
           <Route path="edit/:id" element={<EditArticlePage />} />
-          <Route path="phrase/:id" element={<PhrasePracticePage />} />
-          <Route path="spelling/:id" element={<SpellingPracticePage />} />
-          <Route path="typing/:id" element={<TypingPracticePage />} />
+          <Route path="segment/:id" element={<EditArticlePage />} />
+          <Route path="practice/:articleId/:mode" element={<PracticePage />} />
           <Route path="leaderboard" element={<LeaderboardPage />} />
         </Route>
       </Routes>
