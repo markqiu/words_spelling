@@ -57,13 +57,12 @@ class SpacySegmenter:
         for token in doc:
             # 只保留纯字母单词，过滤标点和数字
             if token.is_alpha and not token.is_stop:
-                word = token.text.lower()
                 lemma = token.lemma_.lower()  # 获取词根（单数形式）
                 
-                # 如果词根未见过，添加该词
+                # 如果词根未见过，添加词根形式
                 if lemma not in seen_lemmas:
                     seen_lemmas.add(lemma)
-                    words.append(word)
+                    words.append(lemma)
         
         return words
     
