@@ -25,6 +25,7 @@ export function EditArticlePage() {
   // 编辑分词相关
   const [editingIndex, setEditingIndex] = useState<number | null>(null)
   const [editValue, setEditValue] = useState('')
+  const [searchQuery, setSearchQuery] = useState('')
 
   // 加载文章（编辑模式）
   useEffect(() => {
@@ -309,8 +310,27 @@ export function EditArticlePage() {
                   点击"AI 分词"按钮开始
                 </div>
               ) : (
-                <div className="segments-list">
-                  {segments.map((segment, index) => (
+                <>
+                  <div className="segment-search">
+                    <input
+                      type="text"
+                      placeholder="搜索片段..."
+                      value={searchQuery}
+                      onChange={(e) => setSearchQuery(e.target.value)}
+                    />
+                    <span className="search-count">
+                      {searchQuery 
+                        ? `${segments.filter(s => s.toLowerCase().includes(searchQuery.toLowerCase())).length} / ${segments.length}` 
+                        : ''}
+                    </span>
+                  </div>
+                  <div className="segments-list">
+                    {segments
+                      .map((segment, index) => ({ segment, index }))
+                      .filter(({ segment }) => 
+                        !searchQuery || segment.toLowerCase().includes(searchQuery.toLowerCase())
+                      )
+                      .map(({ segment, index }) => (
                     <div key={index} className="segment-item">
                       <span className="segment-index">{index + 1}</span>
                       
@@ -364,6 +384,7 @@ export function EditArticlePage() {
                     </div>
                   ))}
                 </div>
+                </>
               )}
             </div>
           </div>
