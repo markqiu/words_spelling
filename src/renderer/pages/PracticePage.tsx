@@ -97,19 +97,20 @@ export function PracticePage() {
   // 开始练习
   const startPractice = useCallback(async (continuePractice: boolean) => {
     let list = [...segments]
+    let savedProgress = null
     
     // 如果继续练习，加载进度
     if (continuePractice) {
-      const progress = await api.getProgress(userName, parseInt(articleId!), practiceMode)
-      if (progress) {
+      savedProgress = await api.getProgress(userName, parseInt(articleId!), practiceMode)
+      if (savedProgress) {
         try {
-          const savedList = JSON.parse(progress.words_list)
+          const savedList = JSON.parse(savedProgress.words_list)
           if (savedList.length > 0) {
             list = savedList
-            setCurrentIndex(progress.current_index)
+            setCurrentIndex(savedProgress.current_index)
             statsRef.current = {
-              correct: progress.correct_count,
-              incorrect: progress.incorrect_count
+              correct: savedProgress.correct_count,
+              incorrect: savedProgress.incorrect_count
             }
           }
         } catch {
@@ -136,7 +137,7 @@ export function PracticePage() {
     }
     
     // 播放当前索引的音频
-    const currentIdx = continuePractice ? (progress?.current_index || 0) : 0
+    const currentIdx = continuePractice ? (savedProgress?.current_index || 0) : 0
     if (list.length > 0 && list[currentIdx]) {
       // 延迟一点播放，确保UI已更新
       setTimeout(() => playAudio(list[currentIdx]), 100)

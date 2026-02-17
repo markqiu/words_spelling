@@ -20,6 +20,6 @@
       "@/*": ["src/*"]
     }
   },
-  "include": ["src/**/*"],
-  "references": [{ "path": "./tsconfig.node.json" }]
+  "include": ["src/renderer/**/*"],
+  "exclude": ["node_modules", "dist", "dist-electron"]
 }
