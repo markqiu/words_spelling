@@ -54,7 +54,8 @@ Rules:
 2. Convert to lowercase
 3. Remove duplicates
 4. Filter out very common words (a, an, the, is, are, was, were, etc.)
-5. Return ONLY a JSON array of words, nothing else
+5. IMPORTANT: If a word appears in both singular and plural forms (e.g., "cat" and "cats", "dog" and "dogs"), only include the singular/base form
+6. Return ONLY a JSON array of words, nothing else
 
 Text:
 {text}

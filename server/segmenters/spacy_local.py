@@ -45,21 +45,24 @@ class SpacySegmenter:
             text: 原始文本
             
         Returns:
-            单词列表（去重、小写、只保留字母）
+            单词列表（去重、小写、只保留字母、单复数合并）
         """
         if not self.nlp:
             return []
         
         doc = self.nlp(text)
         words = []
-        seen = set()
+        seen_lemmas = set()  # 使用词根去重，避免单复数重复
         
         for token in doc:
             # 只保留纯字母单词，过滤标点和数字
             if token.is_alpha and not token.is_stop:
                 word = token.text.lower()
-                if word not in seen:
-                    seen.add(word)
+                lemma = token.lemma_.lower()  # 获取词根（单数形式）
+                
+                # 如果词根未见过，添加该词
+                if lemma not in seen_lemmas:
+                    seen_lemmas.add(lemma)
                     words.append(word)
         
         return words

@@ -129,11 +129,17 @@ export function PracticePage() {
     
     setPracticeList(list)
     setShowSettings(false)
-    setCurrentIndex(0)
     
-    // 播放第一个
-    if (list.length > 0) {
-      playAudio(list[0])
+    // 只有在新练习时才重置为0，继续练习时保持之前的进度
+    if (!continuePractice) {
+      setCurrentIndex(0)
+    }
+    
+    // 播放当前索引的音频
+    const currentIdx = continuePractice ? (progress?.current_index || 0) : 0
+    if (list.length > 0 && list[currentIdx]) {
+      // 延迟一点播放，确保UI已更新
+      setTimeout(() => playAudio(list[currentIdx]), 100)
     }
   }, [segments, practiceCount, userName, articleId, practiceMode])
 
@@ -150,10 +156,12 @@ export function PracticePage() {
       if ('speechSynthesis' in window) {
         const utterance = new SpeechSynthesisUtterance(text)
         utterance.lang = 'en-US'
+        utterance.rate = 175 / 150 // 转换语速
         speechSynthesis.speak(utterance)
       }
     } finally {
-      setIsPlaying(false)
+      // 延迟重置状态，确保音频播放完成
+      setTimeout(() => setIsPlaying(false), 500)
     }
   }
 
@@ -467,7 +475,10 @@ export function PracticePage() {
               }
             }}
             placeholder={`输入你听到的${getModeUnit(practiceMode)}...`}
-            readOnly={showResult}
+            autoComplete="off"
+            autoCorrect="off"
+            autoCapitalize="off"
+            spellCheck="false"
           />
           
           {!showResult ? (
@@ -480,13 +491,26 @@ export function PracticePage() {
               确认 (Enter)
             </button>
           ) : (
-            <button
-              className="btn btn-primary"
-              onClick={handleNext}
-              type="button"
-            >
-              {currentIndex + 1 >= practiceList.length ? '完成 (Enter)' : '下一个 (Enter)'}
-            </button>
+            <div className="result-buttons">
+              <button
+                className="btn btn-secondary"
+                onClick={() => {
+                  setUserInput('')
+                  setShowResult(false)
+                  inputRef.current?.focus()
+                }}
+                type="button"
+              >
+                重试
+              </button>
+              <button
+                className="btn btn-primary"
+                onClick={handleNext}
+                type="button"
+              >
+                {currentIndex + 1 >= practiceList.length ? '完成 (Enter)' : '下一个 (Enter)'}
+              </button>
+            </div>
           )}
         </div>
 

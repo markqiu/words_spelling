@@ -1,12 +1,12 @@
 use std::process::Command;
-use tauri::async_runtime::spawn;
 
 /// 使用系统 TTS 朗读文本 (macOS)
 #[tauri::command]
 pub async fn speak(text: String, rate: Option<i32>) -> Result<(), String> {
     let rate = rate.unwrap_or(175); // 默认语速
     
-    spawn(async move {
+    // 使用 spawn_blocking 来执行阻塞的 say 命令
+    tokio::task::spawn_blocking(move || {
         #[cfg(target_os = "macos")]
         {
             let rate_str = rate.to_string();

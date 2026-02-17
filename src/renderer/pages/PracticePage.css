@@ -203,6 +203,15 @@
   color: #718096;
 }
 
+.result-buttons {
+  display: flex;
+  gap: 12px;
+}
+
+.result-buttons .btn {
+  flex: 1;
+}
+
 .result-section {
   padding: 20px;
   border-radius: 10px;
