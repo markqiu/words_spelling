@@ -2,7 +2,10 @@ use std::sync::Mutex;
 use tauri::State;
 
 use crate::database::DatabaseManager;
-use crate::models::{LeaderboardRecord, Mistake, PracticeProgress, SaveProgressRequest, SaveRecordRequest};
+use crate::models::{
+    LeaderboardRecord, Mistake, PracticeProgress, 
+    SaveProgressRequest, SaveRecordRequest, ScheduledWordsResponse, WordMastery
+};
 
 /// 保存练习进度
 #[tauri::command]
@@ -100,5 +103,46 @@ pub fn get_leaderboard(
 ) -> Result<Vec<LeaderboardRecord>, String> {
     let db = db.lock().map_err(|e| e.to_string())?;
     db.get_leaderboard(article_id, segment_type.as_deref(), limit.unwrap_or(10))
+        .map_err(|e| e.to_string())
+}
+
+/// 获取智能调度的单词（基于记忆曲线）
+#[tauri::command]
+pub fn get_scheduled_words(
+    user_name: String,
+    article_id: i64,
+    segment_type: String,
+    limit: i32,
+    db: State<'_, Mutex<DatabaseManager>>,
+) -> Result<ScheduledWordsResponse, String> {
+    let db = db.lock().map_err(|e| e.to_string())?;
+    db.get_scheduled_words(&user_name, article_id, &segment_type, limit)
+        .map_err(|e| e.to_string())
+}
+
+/// 更新单词熟练度（SM-2 算法）
+#[tauri::command]
+pub fn update_word_mastery(
+    user_name: String,
+    segment_id: i64,
+    segment_content: String,
+    segment_type: String,
+    correct: bool,
+    db: State<'_, Mutex<DatabaseManager>>,
+) -> Result<WordMastery, String> {
+    let db = db.lock().map_err(|e| e.to_string())?;
+    db.update_word_mastery(&user_name, segment_id, &segment_content, &segment_type, correct)
+        .map_err(|e| e.to_string())
+}
+
+/// 获取单词熟练度列表
+#[tauri::command]
+pub fn get_word_masteries(
+    user_name: String,
+    segment_type: Option<String>,
+    db: State<'_, Mutex<DatabaseManager>>,
+) -> Result<Vec<WordMastery>, String> {
+    let db = db.lock().map_err(|e| e.to_string())?;
+    db.get_word_masteries(&user_name, segment_type.as_deref())
         .map_err(|e| e.to_string())
 }

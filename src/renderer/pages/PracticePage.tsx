@@ -10,6 +10,15 @@ interface PracticeStats {
   incorrect: number
 }
 
+// 智能练习列表项（包含 segment_id）
+interface PracticeItem {
+  segmentId: number
+  content: string
+  segmentType: string
+  masteryLevel: number
+  isNew: boolean
+}
+
 export function PracticePage() {
   const { articleId, mode } = useParams<{ articleId: string; mode: string }>()
   const location = useLocation()
@@ -29,16 +38,15 @@ export function PracticePage() {
   const [isPlaying, setIsPlaying] = useState(false)
   
   // 练习设置
-  const [practiceCount, setPracticeCount] = useState<number | null>(null) // null = 全部
+  const [practiceLimit, setPracticeLimit] = useState(20) // 每次练习的单词数量
   const [showSettings, setShowSettings] = useState(true)
-  const [continueFromProgress, setContinueFromProgress] = useState(false)
   
   // 统计
   const statsRef = useRef<PracticeStats>({ correct: 0, incorrect: 0 })
   const [isCompleted, setIsCompleted] = useState(false)
   
-  // 当前练习的片段列表
-  const [practiceList, setPracticeList] = useState<string[]>([])
+  // 当前练习的片段列表（智能调度）
+  const [practiceList, setPracticeList] = useState<PracticeItem[]>([])
   
   // 输入框引用
   const inputRef = useRef<HTMLInputElement>(null)
@@ -69,13 +77,6 @@ export function PracticePage() {
         }
         setSegments(segs.map(s => s.content))
         
-        // 检查是否有保存的进度
-        const progress = await api.getProgress(userName, parseInt(articleId), practiceMode)
-        if (progress && progress.current_index > 0) {
-          setContinueFromProgress(true)
-          // 暂时不自动加载，等用户选择
-        }
-        
       } catch (error) {
         console.error('Error loading data:', error)
         alert('加载数据失败')
@@ -94,55 +95,44 @@ export function PracticePage() {
     }
   }, [currentIndex, showSettings, isCompleted, showResult])
 
-  // 开始练习
-  const startPractice = useCallback(async (continuePractice: boolean) => {
-    let list = [...segments]
-    let savedProgress = null
+  // 开始练习（智能调度模式）
+  const startPractice = useCallback(async () => {
+    if (!articleId) return
     
-    // 如果继续练习，加载进度
-    if (continuePractice) {
-      savedProgress = await api.getProgress(userName, parseInt(articleId!), practiceMode)
-      if (savedProgress) {
-        try {
-          const savedList = JSON.parse(savedProgress.words_list)
-          if (savedList.length > 0) {
-            list = savedList
-            setCurrentIndex(savedProgress.current_index)
-            statsRef.current = {
-              correct: savedProgress.correct_count,
-              incorrect: savedProgress.incorrect_count
-            }
-          }
-        } catch {
-          // 解析失败，使用完整列表
-        }
+    const numId = parseInt(articleId)
+    
+    try {
+      // 调用智能调度API获取单词
+      const response = await api.getScheduledWords(userName, numId, practiceMode, practiceLimit)
+      
+      if (response.words.length === 0) {
+        alert('该文章没有可练习的单词，请先进行分词')
+        return
       }
-    } else {
-      // 清除旧进度
-      await api.clearProgress(userName, parseInt(articleId!), practiceMode)
-      statsRef.current = { correct: 0, incorrect: 0 }
-    }
-    
-    // 应用数量限制
-    if (practiceCount && practiceCount < list.length) {
-      list = list.slice(0, practiceCount)
-    }
-    
-    setPracticeList(list)
-    setShowSettings(false)
-    
-    // 只有在新练习时才重置为0，继续练习时保持之前的进度
-    if (!continuePractice) {
+      
+      // 转换为 PracticeItem 格式
+      const list: PracticeItem[] = response.words.map(w => ({
+        segmentId: w.segment_id,
+        content: w.content,
+        segmentType: w.segment_type,
+        masteryLevel: w.mastery_level,
+        isNew: w.is_new
+      }))
+      
+      setPracticeList(list)
+      setShowSettings(false)
       setCurrentIndex(0)
+      statsRef.current = { correct: 0, incorrect: 0 }
+      
+      // 播放第一个单词
+      if (list.length > 0) {
+        setTimeout(() => playAudio(list[0].content), 100)
+      }
+    } catch (error) {
+      console.error('Error starting practice:', error)
+      alert('加载练习内容失败')
     }
-    
-    // 播放当前索引的音频
-    const currentIdx = continuePractice ? (savedProgress?.current_index || 0) : 0
-    if (list.length > 0 && list[currentIdx]) {
-      // 延迟一点播放，确保UI已更新
-      setTimeout(() => playAudio(list[currentIdx]), 100)
-    }
-  }, [segments, practiceCount, userName, articleId, practiceMode])
+  }, [userName, articleId, practiceMode, practiceLimit])
 
   // 播放音频
   const playAudio = async (text: string) => {
@@ -169,15 +159,16 @@ export function PracticePage() {
   // 重新播放
   const handleReplay = () => {
     if (practiceList[currentIndex]) {
-      playAudio(practiceList[currentIndex])
+      playAudio(practiceList[currentIndex].content)
     }
   }
 
   // 检查答案
   const checkAnswer = async () => {
-    if (!userInput.trim()) return
+    if (!userInput.trim() || !articleId) return
     
-    const correctAnswer = practiceList[currentIndex]
+    const currentItem = practiceList[currentIndex]
+    const correctAnswer = currentItem.content
     const normalizedInput = userInput.trim().toLowerCase()
     const normalizedAnswer = correctAnswer.toLowerCase()
     
@@ -190,35 +181,19 @@ export function PracticePage() {
       statsRef.current.correct++
     } else {
       statsRef.current.incorrect++
-      
-      // 添加到错词本
-      try {
-        // 注意：这里需要 segment_id，暂时用 0 代替
-        // 实际应该从数据库查询 segment id
-        await api.addMistake(userName, 0, correctAnswer, practiceMode)
-      } catch (error) {
-        console.error('Error adding mistake:', error)
-      }
     }
     
-    // 保存进度
-    await saveProgress()
-  }
-
-  // 保存进度
-  const saveProgress = async () => {
+    // 更新单词熟练度（SM-2 算法）
     try {
-      await api.saveProgress(
+      await api.updateWordMastery(
         userName,
-        parseInt(articleId!),
-        practiceMode,
-        currentIndex + 1, // 保存下一个位置
-        practiceList,
-        statsRef.current.correct,
-        statsRef.current.incorrect
+        currentItem.segmentId,
+        currentItem.content,
+        currentItem.segmentType,
+        correct
       )
     } catch (error) {
-      console.error('Error saving progress:', error)
+      console.error('Error updating mastery:', error)
     }
   }
 
@@ -232,31 +207,30 @@ export function PracticePage() {
       completePractice()
     } else {
       setCurrentIndex(prev => prev + 1)
-      playAudio(practiceList[currentIndex + 1])
+      playAudio(practiceList[currentIndex + 1].content)
     }
   }
 
   // 完成练习
   const completePractice = async () => {
-    setIsCompleted(true)
+    if (!articleId) return
     
-    // 清除进度
-    await api.clearProgress(userName, parseInt(articleId!), practiceMode)
+    setIsCompleted(true)
     
     // 计算得分
     const total = statsRef.current.correct + statsRef.current.incorrect
     const accuracy = total > 0 ? (statsRef.current.correct / total) * 100 : 0
-    const score = accuracy // 可以加入速度因素
+    const score = accuracy
     
     // 保存记录
     try {
       await api.saveRecord(
         userName,
-        parseInt(articleId!),
+        parseInt(articleId),
         practiceMode,
         score,
         accuracy,
-        0 // WPM 暂时为 0
+        0
       )
     } catch (error) {
       console.error('Error saving record:', error)
@@ -284,7 +258,7 @@ export function PracticePage() {
     if (showSettings) {
       if (e.key === 'Enter') {
         e.preventDefault()
-        startPractice(false)
+        startPractice()
       } else if (e.key === 'Escape') {
         e.preventDefault()
         navigate('/articles')
@@ -385,36 +359,30 @@ export function PracticePage() {
           
           <div className="settings-form">
             <div className="form-group">
-              <label htmlFor="count">练习数量</label>
+              <label htmlFor="limit">本次练习数量</label>
               <select
-                id="count"
-                value={practiceCount || 'all'}
-                onChange={(e) => setPracticeCount(e.target.value === 'all' ? null : parseInt(e.target.value))}
+                id="limit"
+                value={practiceLimit}
+                onChange={(e) => setPracticeLimit(parseInt(e.target.value))}
               >
-                <option value="all">全部 ({segments.length}个)</option>
-                <option value="10">前10个</option>
-                <option value="20">前20个</option>
-                <option value="50">前50个</option>
+                <option value="10">10个</option>
+                <option value="20">20个</option>
+                <option value="30">30个</option>
+                <option value="50">50个</option>
               </select>
             </div>
+            <p className="hint-text">
+              系统将根据记忆曲线自动选择需要复习的单词
+            </p>
           </div>
           
           <div className="settings-actions">
-            {continueFromProgress && (
-              <button
-                className="btn btn-success"
-                onClick={() => startPractice(true)}
-                type="button"
-              >
-                继续上次练习
-              </button>
-            )}
             <button
               className="btn btn-primary"
-              onClick={() => startPractice(false)}
+              onClick={() => startPractice()}
               type="button"
             >
-              从头开始 (Enter)
+              开始练习 (Enter)
             </button>
             <button
               className="btn btn-secondary"
@@ -525,14 +493,14 @@ export function PracticePage() {
                 <div className="diff-row">
                   <span className="diff-label">你的输入：</span>
                   <DiffDisplay 
-                    display={diffChars(userInput, practiceList[currentIndex]).userDisplay} 
+                    display={diffChars(userInput, practiceList[currentIndex].content).userDisplay} 
                     type="user"
                   />
                 </div>
                 <div className="diff-row">
                   <span className="diff-label">正确答案：</span>
                   <DiffDisplay 
-                    display={diffChars(userInput, practiceList[currentIndex]).answerDisplay} 
+                    display={diffChars(userInput, practiceList[currentIndex].content).answerDisplay} 
                     type="answer"
                   />
                 </div>

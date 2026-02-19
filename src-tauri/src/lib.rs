@@ -47,6 +47,10 @@ pub fn run() {
             commands::practice::get_mistakes,
             commands::practice::save_record,
             commands::practice::get_leaderboard,
+            // 智能复习（SM-2）
+            commands::practice::get_scheduled_words,
+            commands::practice::update_word_mastery,
+            commands::practice::get_word_masteries,
             // TTS
             commands::tts::speak,
             commands::tts::stop_speaking,

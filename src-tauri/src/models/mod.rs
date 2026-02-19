@@ -118,3 +118,55 @@ pub struct SegmentResponse {
     pub success: bool,
     pub error: Option<String>,
 }
+
+/// 单词熟练度（SM-2 算法）
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct WordMastery {
+    pub user_name: String,
+    pub segment_id: i64,
+    pub segment_content: String,
+    pub segment_type: String,
+    pub mastery_level: i32,      // 0-5, 0=新词, 5=完全掌握
+    pub ease_factor: f64,        // 难度因子, 默认 2.5
+    pub interval_days: i32,      // 复习间隔(天)
+    pub next_review_at: String,  // 下次复习时间
+    pub last_review_at: String,  // 上次复习时间
+    pub review_count: i32,       // 复习次数
+}
+
+/// 获取智能调度单词请求
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct GetScheduledWordsRequest {
+    pub user_name: String,
+    pub article_id: i64,
+    pub segment_type: String,
+    pub limit: i32,              // 本次练习的单词数量
+}
+
+/// 更新单词熟练度请求
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct UpdateMasteryRequest {
+    pub user_name: String,
+    pub segment_id: i64,
+    pub segment_content: String,
+    pub segment_type: String,
+    pub correct: bool,           // 是否回答正确
+}
+
+/// 智能调度单词响应
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ScheduledWordsResponse {
+    pub words: Vec<ScheduledWord>,
+    pub new_words_count: i32,   // 新单词数量
+    pub review_words_count: i32, // 复习单词数量
+}
+
+/// 调度单词
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ScheduledWord {
+    pub segment_id: i64,
+    pub content: String,
+    pub segment_type: String,
+    pub mastery_level: i32,
+    pub is_new: bool,           // 是否是新单词
+}

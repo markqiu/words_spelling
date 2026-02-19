@@ -60,6 +60,35 @@ export interface SegmentResponse {
   error?: string;
 }
 
+// ========== 智能复习（SM-2）类型 ==========
+
+export interface WordMastery {
+  user_name: string;
+  segment_id: number;
+  segment_content: string;
+  segment_type: string;
+  mastery_level: number;      // 0-5, 0=新词, 5=完全掌握
+  ease_factor: number;        // 难度因子, 默认 2.5
+  interval_days: number;      // 复习间隔(天)
+  next_review_at: string;     // 下次复习时间
+  last_review_at: string;    // 上次复习时间
+  review_count: number;      // 复习次数
+}
+
+export interface ScheduledWord {
+  segment_id: number;
+  content: string;
+  segment_type: string;
+  mastery_level: number;
+  is_new: boolean;
+}
+
+export interface ScheduledWordsResponse {
+  words: ScheduledWord[];
+  new_words_count: number;
+  review_words_count: number;
+}
+
 // ========== 文章管理 ==========
 
 export async function getArticles(): Promise<Article[]> {
@@ -242,4 +271,55 @@ export async function speak(text: string, rate?: number): Promise<void> {
 
 export async function stopSpeaking(): Promise<void> {
   return invoke('stop_speaking');
+}
+
+// ========== 智能复习（SM-2）==========
+
+/**
+ * 获取需要复习的单词（基于记忆曲线）
+ */
+export async function getScheduledWords(
+  userName: string,
+  articleId: number,
+  segmentType: string,
+  limit: number
+): Promise<ScheduledWordsResponse> {
+  return invoke('get_scheduled_words', { 
+    userName, 
+    articleId, 
+    segmentType, 
+    limit 
+  });
+}
+
+/**
+ * 更新单词熟练度（SM-2 算法）
+ */
+export async function updateWordMastery(
+  userName: string,
+  segmentId: number,
+  segmentContent: string,
+  segmentType: string,
+  correct: boolean
+): Promise<WordMastery> {
+  return invoke('update_word_mastery', { 
+    userName, 
+    segmentId, 
+    segmentContent, 
+    segmentType, 
+    correct 
+  });
+}
+
+/**
+ * 获取单词熟练度列表
+ */
+export async function getWordMasteries(
+  userName: string,
+  segmentType?: string
+): Promise<WordMastery[]> {
+  return invoke('get_word_masteries', { 
+    userName, 
+    segmentType 
+  });
 }
