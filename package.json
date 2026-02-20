@@ -1,6 +1,6 @@
 {
   "name": "spelling-game",
-  "version": "2.0.0",
+  "version": "2.0.3",
   "description": "单词拼写与打字练习软件 - Tauri 版本",
   "scripts": {
     "dev:frontend": "vite",

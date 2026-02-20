@@ -119,7 +119,7 @@ export function LeaderboardPage() {
       ) : (
         <>
           {/* 我的统计卡片 */}
-          {myStats && myStats.totalPractices > 0 && (
+          {myStats && myStats.total_practices > 0 && (
             <div style={styles.myStatsCard}>
               <div style={styles.myStatsHeader}>
                 <h3 style={styles.myStatsTitle}>📊 我的练习统计</h3>
@@ -134,49 +134,49 @@ export function LeaderboardPage() {
               
               <div style={styles.myStatsGrid}>
                 <div style={styles.myStatItem}>
-                  <span style={styles.myStatValue}>{myStats.totalPractices}</span>
+                  <span style={styles.myStatValue}>{myStats.total_practices}</span>
                   <span style={styles.myStatLabel}>练习次数</span>
                 </div>
                 <div style={styles.myStatItem}>
-                  <span style={styles.myStatValue}>{myStats.totalWords}</span>
+                  <span style={styles.myStatValue}>{myStats.total_words}</span>
                   <span style={styles.myStatLabel}>总单词数</span>
                 </div>
                 <div style={styles.myStatItem}>
-                  <span style={styles.myStatValue}>{myStats.totalCorrect}</span>
+                  <span style={styles.myStatValue}>{myStats.total_correct}</span>
                   <span style={styles.myStatLabel}>正确数</span>
                 </div>
                 <div style={styles.myStatItem}>
-                  <span style={styles.myStatValue}>{myStats.totalIncorrect}</span>
+                  <span style={styles.myStatValue}>{myStats.total_incorrect}</span>
                   <span style={styles.myStatLabel}>错误数</span>
                 </div>
                 <div style={styles.myStatItem}>
-                  <span style={styles.myStatValue}>{myStats.avgAccuracy.toFixed(1)}%</span>
+                  <span style={styles.myStatValue}>{myStats.avg_accuracy.toFixed(1)}%</span>
                   <span style={styles.myStatLabel}>平均正确率</span>
                 </div>
                 <div style={styles.myStatItem}>
-                  <span style={styles.myStatValue}>{myStats.avgWpm.toFixed(1)}</span>
+                  <span style={styles.myStatValue}>{myStats.avg_wpm.toFixed(1)}</span>
                   <span style={styles.myStatLabel}>平均WPM</span>
                 </div>
                 <div style={styles.myStatItem}>
-                  <span style={styles.myStatValue}>{myStats.bestAccuracy.toFixed(1)}%</span>
+                  <span style={styles.myStatValue}>{myStats.best_accuracy.toFixed(1)}%</span>
                   <span style={styles.myStatLabel}>最高正确率</span>
                 </div>
                 <div style={styles.myStatItem}>
-                  <span style={styles.myStatValue}>{myStats.bestWpm.toFixed(1)}</span>
+                  <span style={styles.myStatValue}>{myStats.best_wpm.toFixed(1)}</span>
                   <span style={styles.myStatLabel}>最高WPM</span>
                 </div>
                 <div style={styles.myStatItem}>
-                  <span style={styles.myStatValue}>{myStats.totalDurationMinutes.toFixed(0)}</span>
+                  <span style={styles.myStatValue}>{myStats.total_duration_minutes.toFixed(0)}</span>
                   <span style={styles.myStatLabel}>总时长(分钟)</span>
                 </div>
               </div>
               
               {/* 历史记录详情 */}
-              {showMyStats && myStats.recentHistories.length > 0 && (
+              {showMyStats && myStats.recent_histories.length > 0 && (
                 <div style={styles.historySection}>
                   <h4 style={styles.historyTitle}>最近练习记录</h4>
                   <div style={styles.historyList}>
-                    {myStats.recentHistories.map((history) => (
+                    {myStats.recent_histories.map((history: api.PracticeHistory) => (
                       <div key={history.id} style={styles.historyItem}>
                         <div style={styles.historyMain}>
                           <span style={styles.historyTitle}>{history.article_title}</span>
