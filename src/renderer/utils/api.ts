@@ -323,3 +323,79 @@ export async function getWordMasteries(
     segmentType 
   });
 }
+
+// ========== 练习历史记录 ==========
+
+export interface PracticeHistory {
+  id: number;
+  user_name: string;
+  article_id: number;
+  article_title: string;
+  segment_type: string;
+  correct_count: number;
+  incorrect_count: number;
+  total_count: number;
+  accuracy: number;
+  wpm: number;
+  duration_seconds: number;
+  completed_at: string;
+}
+
+export interface UserStatistics {
+  user_name: string;
+  total_practices: number;
+  total_correct: number;
+  total_incorrect: number;
+  total_words: number;
+  avg_accuracy: number;
+  avg_wpm: number;
+  best_accuracy: number;
+  best_wpm: number;
+  total_duration_minutes: number;
+  recent_histories: PracticeHistory[];
+}
+
+/**
+ * 保存练习历史
+ */
+export async function savePracticeHistory(
+  userName: string,
+  articleId: number,
+  segmentType: string,
+  correctCount: number,
+  incorrectCount: number,
+  durationSeconds: number
+): Promise<void> {
+  return invoke('save_practice_history', { 
+    request: {
+      user_name: userName,
+      article_id: articleId,
+      segment_type: segmentType,
+      correct_count: correctCount,
+      incorrect_count: incorrectCount,
+      duration_seconds: durationSeconds
+    }
+  });
+}
+
+/**
+ * 获取练习历史
+ */
+export async function getPracticeHistory(
+  userName: string,
+  limit?: number
+): Promise<PracticeHistory[]> {
+  return invoke('get_practice_history', { 
+    userName, 
+    limit 
+  });
+}
+
+/**
+ * 获取用户统计信息
+ */
+export async function getUserStatistics(userName: string): Promise<UserStatistics> {
+  return invoke('get_user_statistics', { 
+    userName 
+  });
+}

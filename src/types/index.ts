@@ -91,3 +91,34 @@ export interface ArticleWordProgress {
   errorCount: number
   practicedAt?: string
 }
+
+// 练习历史记录
+export interface PracticeHistory {
+  id: number
+  userName: string
+  articleId: number
+  articleTitle: string
+  segmentType: string
+  correctCount: number
+  incorrectCount: number
+  totalCount: number
+  accuracy: number
+  wpm: number
+  durationSeconds: number
+  completedAt: string
+}
+
+// 用户统计信息
+export interface UserStatistics {
+  userName: string
+  totalPractices: number
+  totalCorrect: number
+  totalIncorrect: number
+  totalWords: number
+  avgAccuracy: number
+  avgWpm: number
+  bestAccuracy: number
+  bestWpm: number
+  totalDurationMinutes: number
+  recentHistories: PracticeHistory[]
+}

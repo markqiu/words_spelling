@@ -146,3 +146,43 @@ pub fn get_word_masteries(
     db.get_word_masteries(&user_name, segment_type.as_deref())
         .map_err(|e| e.to_string())
 }
+
+/// 保存练习历史
+#[tauri::command]
+pub fn save_practice_history(
+    request: crate::models::SaveHistoryRequest,
+    db: State<'_, Mutex<DatabaseManager>>,
+) -> Result<(), String> {
+    let db = db.lock().map_err(|e| e.to_string())?;
+    db.save_practice_history(
+        &request.user_name,
+        request.article_id,
+        &request.segment_type,
+        request.correct_count,
+        request.incorrect_count,
+        request.duration_seconds,
+    ).map_err(|e| e.to_string())
+}
+
+/// 获取练习历史
+#[tauri::command]
+pub fn get_practice_history(
+    user_name: String,
+    limit: Option<i32>,
+    db: State<'_, Mutex<DatabaseManager>>,
+) -> Result<Vec<crate::models::PracticeHistory>, String> {
+    let db = db.lock().map_err(|e| e.to_string())?;
+    db.get_practice_history(&user_name, limit.unwrap_or(20))
+        .map_err(|e| e.to_string())
+}
+
+/// 获取用户统计信息
+#[tauri::command]
+pub fn get_user_statistics(
+    user_name: String,
+    db: State<'_, Mutex<DatabaseManager>>,
+) -> Result<crate::models::UserStatistics, String> {
+    let db = db.lock().map_err(|e| e.to_string())?;
+    db.get_user_statistics(&user_name)
+        .map_err(|e| e.to_string())
+}

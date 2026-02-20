@@ -127,7 +127,17 @@
 }
 
 .progress-info .stats {
-  color: #a0aec0;
+  color: #48bb78;
+}
+
+.progress-info .timer {
+  color: #ed8936;
+  font-weight: 500;
+}
+
+.progress-info .wpm-stats {
+  color: #4299e1;
+  font-weight: 500;
 }
 
 .keyboard-hints {

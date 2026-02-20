@@ -1,17 +1,64 @@
 import { useEffect, useState } from 'react'
 import type { LeaderboardEntry } from '../../types'
+import * as api from '../utils/api'
 
 export function LeaderboardPage() {
   const [leaderboard, setLeaderboard] = useState<LeaderboardEntry[]>([])
   const [isLoading, setIsLoading] = useState(true)
+  const [myStats, setMyStats] = useState<api.UserStatistics | null>(null)
+  const [showMyStats, setShowMyStats] = useState(false)
+  const userName = '练习者' // 可以从状态或本地存储获取
 
   useEffect(() => {
-    const loadLeaderboard = async () => {
+    const loadData = async () => {
       try {
-        const data = await window.electronAPI.getLeaderboard()
-        // 确保数据按总分排序
-        const sortedData = data.sort((a: LeaderboardEntry, b: LeaderboardEntry) => b.totalScore - a.totalScore)
+        setIsLoading(true)
+        
+        // 加载排行榜数据
+        const records = await api.getLeaderboard()
+        
+        // 聚合数据到用户级别
+        const userMap = new Map<string, {
+          totalScore: number
+          totalPractices: number
+          totalAccuracy: number
+          totalWpm: number
+        }>()
+        
+        records.forEach(record => {
+          const existing = userMap.get(record.user_name) || {
+            totalScore: 0,
+            totalPractices: 0,
+            totalAccuracy: 0,
+            totalWpm: 0
+          }
+          existing.totalScore += record.score
+          existing.totalPractices += 1
+          existing.totalAccuracy += record.accuracy
+          existing.totalWpm += record.wpm
+          userMap.set(record.user_name, existing)
+        })
+        
+        // 转换为排行榜条目
+        const entries: LeaderboardEntry[] = Array.from(userMap.entries()).map(([userName, data]) => ({
+          userName,
+          totalScore: Math.round(data.totalScore),
+          totalPractices: data.totalPractices,
+          avgAccuracy: Math.round(data.totalAccuracy / data.totalPractices),
+          avgWpm: Math.round(data.totalWpm / data.totalPractices * 10) / 10
+        }))
+        
+        // 按总分排序
+        const sortedData = entries.sort((a, b) => b.totalScore - a.totalScore)
         setLeaderboard(sortedData)
+        
+        // 加载当前用户的统计数据
+        try {
+          const stats = await api.getUserStatistics(userName)
+          setMyStats(stats)
+        } catch (e) {
+          console.log('No user stats yet')
+        }
       } catch (error) {
         console.error('Load leaderboard error:', error)
       } finally {
@@ -19,8 +66,8 @@ export function LeaderboardPage() {
       }
     }
 
-    loadLeaderboard()
-  }, [])
+    loadData()
+  }, [userName])
 
   const getRankIcon = (rank: number) => {
     switch (rank) {
@@ -71,6 +118,94 @@ export function LeaderboardPage() {
         </div>
       ) : (
         <>
+          {/* 我的统计卡片 */}
+          {myStats && myStats.totalPractices > 0 && (
+            <div style={styles.myStatsCard}>
+              <div style={styles.myStatsHeader}>
+                <h3 style={styles.myStatsTitle}>📊 我的练习统计</h3>
+                <button 
+                  style={styles.toggleButton}
+                  onClick={() => setShowMyStats(!showMyStats)}
+                  type="button"
+                >
+                  {showMyStats ? '收起详情' : '查看详情'}
+                </button>
+              </div>
+              
+              <div style={styles.myStatsGrid}>
+                <div style={styles.myStatItem}>
+                  <span style={styles.myStatValue}>{myStats.totalPractices}</span>
+                  <span style={styles.myStatLabel}>练习次数</span>
+                </div>
+                <div style={styles.myStatItem}>
+                  <span style={styles.myStatValue}>{myStats.totalWords}</span>
+                  <span style={styles.myStatLabel}>总单词数</span>
+                </div>
+                <div style={styles.myStatItem}>
+                  <span style={styles.myStatValue}>{myStats.totalCorrect}</span>
+                  <span style={styles.myStatLabel}>正确数</span>
+                </div>
+                <div style={styles.myStatItem}>
+                  <span style={styles.myStatValue}>{myStats.totalIncorrect}</span>
+                  <span style={styles.myStatLabel}>错误数</span>
+                </div>
+                <div style={styles.myStatItem}>
+                  <span style={styles.myStatValue}>{myStats.avgAccuracy.toFixed(1)}%</span>
+                  <span style={styles.myStatLabel}>平均正确率</span>
+                </div>
+                <div style={styles.myStatItem}>
+                  <span style={styles.myStatValue}>{myStats.avgWpm.toFixed(1)}</span>
+                  <span style={styles.myStatLabel}>平均WPM</span>
+                </div>
+                <div style={styles.myStatItem}>
+                  <span style={styles.myStatValue}>{myStats.bestAccuracy.toFixed(1)}%</span>
+                  <span style={styles.myStatLabel}>最高正确率</span>
+                </div>
+                <div style={styles.myStatItem}>
+                  <span style={styles.myStatValue}>{myStats.bestWpm.toFixed(1)}</span>
+                  <span style={styles.myStatLabel}>最高WPM</span>
+                </div>
+                <div style={styles.myStatItem}>
+                  <span style={styles.myStatValue}>{myStats.totalDurationMinutes.toFixed(0)}</span>
+                  <span style={styles.myStatLabel}>总时长(分钟)</span>
+                </div>
+              </div>
+              
+              {/* 历史记录详情 */}
+              {showMyStats && myStats.recentHistories.length > 0 && (
+                <div style={styles.historySection}>
+                  <h4 style={styles.historyTitle}>最近练习记录</h4>
+                  <div style={styles.historyList}>
+                    {myStats.recentHistories.map((history) => (
+                      <div key={history.id} style={styles.historyItem}>
+                        <div style={styles.historyMain}>
+                          <span style={styles.historyTitle}>{history.article_title}</span>
+                          <span style={styles.historyType}>
+                            {history.segment_type === 'word' ? '单词' : 
+                             history.segment_type === 'phrase' ? '短语' : '短句'}
+                          </span>
+                        </div>
+                        <div style={styles.historyStats}>
+                          <span>✓{history.correct_count} ✗{history.incorrect_count}</span>
+                          <span>{history.accuracy.toFixed(1)}%</span>
+                          <span>{history.wpm.toFixed(1)} WPM</span>
+                          <span style={styles.historyTime}>
+                            {new Date(history.completed_at).toLocaleString('zh-CN', {
+                              month: 'numeric',
+                              day: 'numeric',
+                              hour: '2-digit',
+                              minute: '2-digit'
+                            })}
+                          </span>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+          
           {/* 前三名展示 */}
           {leaderboard.length > 0 && (
             <div style={styles.topThree}>
@@ -377,5 +512,103 @@ const styles: Record<string, React.CSSProperties> = {
   summaryLabel: {
     fontSize: '13px',
     color: 'var(--text-secondary)',
+  },
+  // 我的统计卡片样式
+  myStatsCard: {
+    background: 'var(--card-bg)',
+    borderRadius: 'var(--radius)',
+    boxShadow: 'var(--shadow)',
+    padding: '24px',
+    marginBottom: '24px',
+  },
+  myStatsHeader: {
+    display: 'flex',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: '16px',
+  },
+  myStatsTitle: {
+    fontSize: '18px',
+    fontWeight: 600,
+    color: 'var(--text-primary)',
+    margin: 0,
+  },
+  toggleButton: {
+    padding: '6px 12px',
+    fontSize: '13px',
+    background: 'var(--primary-color)',
+    color: 'white',
+    border: 'none',
+    borderRadius: 'var(--radius)',
+    cursor: 'pointer',
+  },
+  myStatsGrid: {
+    display: 'grid',
+    gridTemplateColumns: 'repeat(auto-fit, minmax(100px, 1fr))',
+    gap: '12px',
+  },
+  myStatItem: {
+    textAlign: 'center' as const,
+    padding: '12px',
+    background: 'var(--bg-color)',
+    borderRadius: 'var(--radius)',
+  },
+  myStatValue: {
+    display: 'block',
+    fontSize: '20px',
+    fontWeight: 700,
+    color: 'var(--primary-color)',
+    marginBottom: '4px',
+  },
+  myStatLabel: {
+    display: 'block',
+    fontSize: '12px',
+    color: 'var(--text-secondary)',
+  },
+  historySection: {
+    marginTop: '20px',
+    borderTop: '1px solid var(--border-color)',
+    paddingTop: '16px',
+  },
+  historyTitle: {
+    fontSize: '14px',
+    fontWeight: 600,
+    color: 'var(--text-primary)',
+    marginBottom: '12px',
+  },
+  historyList: {
+    display: 'flex',
+    flexDirection: 'column' as const,
+    gap: '8px',
+  },
+  historyItem: {
+    display: 'flex',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    padding: '10px 12px',
+    background: 'var(--bg-color)',
+    borderRadius: 'var(--radius)',
+  },
+  historyMain: {
+    display: 'flex',
+    flexDirection: 'column' as const,
+    gap: '2px',
+  },
+  historyStats: {
+    display: 'flex',
+    gap: '12px',
+    fontSize: '12px',
+    color: 'var(--text-secondary)',
+  },
+  historyType: {
+    fontSize: '11px',
+    padding: '2px 6px',
+    background: 'var(--primary-color)',
+    color: 'white',
+    borderRadius: '4px',
+    width: 'fit-content',
+  },
+  historyTime: {
+    color: 'var(--text-muted)',
   },
 }

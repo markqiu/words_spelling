@@ -51,6 +51,10 @@ pub fn run() {
             commands::practice::get_scheduled_words,
             commands::practice::update_word_mastery,
             commands::practice::get_word_masteries,
+            // 练习历史
+            commands::practice::save_practice_history,
+            commands::practice::get_practice_history,
+            commands::practice::get_user_statistics,
             // TTS
             commands::tts::speak,
             commands::tts::stop_speaking,

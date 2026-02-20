@@ -44,6 +44,8 @@ export function PracticePage() {
   // 统计
   const statsRef = useRef<PracticeStats>({ correct: 0, incorrect: 0 })
   const [isCompleted, setIsCompleted] = useState(false)
+  const startTimeRef = useRef<number>(0) // 记录开始时间
+  const [elapsedTime, setElapsedTime] = useState(0) // 经过的时间（秒）
   
   // 当前练习的片段列表（智能调度）
   const [practiceList, setPracticeList] = useState<PracticeItem[]>([])
@@ -95,6 +97,26 @@ export function PracticePage() {
     }
   }, [currentIndex, showSettings, isCompleted, showResult])
 
+  // 计时器
+  useEffect(() => {
+    let intervalId: NodeJS.Timeout | null = null
+    
+    // 只有在练习中（不在设置界面、完成界面、结果界面）才计时
+    if (!showSettings && !isCompleted && !showResult) {
+      intervalId = setInterval(() => {
+        if (startTimeRef.current > 0) {
+          setElapsedTime(Math.floor((Date.now() - startTimeRef.current) / 1000))
+        }
+      }, 1000)
+    }
+    
+    return () => {
+      if (intervalId) {
+        clearInterval(intervalId)
+      }
+    }
+  }, [showSettings, isCompleted, showResult])
+
   // 开始练习（智能调度模式）
   const startPractice = useCallback(async () => {
     if (!articleId) return
@@ -123,6 +145,7 @@ export function PracticePage() {
       setShowSettings(false)
       setCurrentIndex(0)
       statsRef.current = { correct: 0, incorrect: 0 }
+      startTimeRef.current = Date.now() // 记录开始时间
       
       // 播放第一个单词
       if (list.length > 0) {
@@ -136,24 +159,33 @@ export function PracticePage() {
 
   // 播放音频
   const playAudio = async (text: string) => {
-    if (isPlaying) return
+    // 停止任何正在播放的
+    try {
+      await api.stopSpeaking()
+    } catch (e) {
+      // 忽略错误
+    }
+    speechSynthesis.cancel()
+    
+    setIsPlaying(true)
     
     try {
-      setIsPlaying(true)
+      console.log('Playing audio:', text)
       await api.speak(text, 175)
+      console.log('Audio finished:', text)
     } catch (error) {
-      console.error('TTS error:', error)
+      console.error('TTS error, falling back to Web Speech API:', error)
       // 回退到 Web Speech API
-      if ('speechSynthesis' in window) {
-        const utterance = new SpeechSynthesisUtterance(text)
-        utterance.lang = 'en-US'
-        utterance.rate = 175 / 150 // 转换语速
-        speechSynthesis.speak(utterance)
-      }
-    } finally {
-      // 延迟重置状态，确保音频播放完成
-      setTimeout(() => setIsPlaying(false), 500)
+      const utterance = new SpeechSynthesisUtterance(text)
+      utterance.lang = 'en-US'
+      utterance.rate = 1.0
+      speechSynthesis.speak(utterance)
     }
+    
+    // 延迟重置播放状态
+    setTimeout(() => {
+      setIsPlaying(false)
+    }, 1000)
   }
 
   // 重新播放
@@ -217,12 +249,13 @@ export function PracticePage() {
     
     setIsCompleted(true)
     
-    // 计算得分
+    // 计算得分和时长
     const total = statsRef.current.correct + statsRef.current.incorrect
     const accuracy = total > 0 ? (statsRef.current.correct / total) * 100 : 0
     const score = accuracy
+    const durationSeconds = Math.round((Date.now() - startTimeRef.current) / 1000)
     
-    // 保存记录
+    // 保存记录（排行榜）
     try {
       await api.saveRecord(
         userName,
@@ -231,6 +264,16 @@ export function PracticePage() {
         score,
         accuracy,
         0
+      )
+      
+      // 保存练习历史（包含WPM）
+      await api.savePracticeHistory(
+        userName,
+        parseInt(articleId),
+        practiceMode,
+        statsRef.current.correct,
+        statsRef.current.incorrect,
+        durationSeconds
       )
     } catch (error) {
       console.error('Error saving record:', error)
@@ -311,6 +354,8 @@ export function PracticePage() {
   if (isCompleted) {
     const total = statsRef.current.correct + statsRef.current.incorrect
     const accuracy = total > 0 ? Math.round((statsRef.current.correct / total) * 100) : 0
+    const durationSeconds = Math.round((Date.now() - startTimeRef.current) / 1000)
+    const wpm = durationSeconds > 0 ? ((total / durationSeconds) * 60).toFixed(1) : '0.0'
     
     return (
       <div className="practice-page completed">
@@ -329,6 +374,14 @@ export function PracticePage() {
             <div className="stat-item">
               <span className="stat-value">{accuracy}%</span>
               <span className="stat-label">正确率</span>
+            </div>
+            <div className="stat-item">
+              <span className="stat-value">{wpm}</span>
+              <span className="stat-label">单词/分钟</span>
+            </div>
+            <div className="stat-item">
+              <span className="stat-value">{Math.floor(durationSeconds / 60)}:{(durationSeconds % 60).toString().padStart(2, '0')}</span>
+              <span className="stat-label">用时</span>
             </div>
           </div>
           
@@ -406,6 +459,12 @@ export function PracticePage() {
           <span>{currentIndex + 1} / {practiceList.length}</span>
           <span className="stats">
             ✓ {statsRef.current.correct} ✗ {statsRef.current.incorrect}
+          </span>
+          <span className="timer">
+            ⏱️ {Math.floor(elapsedTime / 60)}:{(elapsedTime % 60).toString().padStart(2, '0')}
+          </span>
+          <span className="wpm-stats">
+            ⚡ {elapsedTime > 0 ? ((statsRef.current.correct + statsRef.current.incorrect) / elapsedTime * 60).toFixed(1) : '0.0'} WPM
           </span>
         </div>
         <div className="keyboard-hints">

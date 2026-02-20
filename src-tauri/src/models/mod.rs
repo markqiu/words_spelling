@@ -170,3 +170,47 @@ pub struct ScheduledWord {
     pub mastery_level: i32,
     pub is_new: bool,           // 是否是新单词
 }
+
+/// 练习历史记录
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct PracticeHistory {
+    pub id: i64,
+    pub user_name: String,
+    pub article_id: i64,
+    pub article_title: String,
+    pub segment_type: String,
+    pub correct_count: i32,
+    pub incorrect_count: i32,
+    pub total_count: i32,
+    pub accuracy: f64,
+    pub wpm: f64,               // 每分钟单词数
+    pub duration_seconds: i32,   // 练习时长(秒)
+    pub completed_at: String,
+}
+
+/// 保存练习历史请求
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SaveHistoryRequest {
+    pub user_name: String,
+    pub article_id: i64,
+    pub segment_type: String,
+    pub correct_count: i32,
+    pub incorrect_count: i32,
+    pub duration_seconds: i32,
+}
+
+/// 用户统计信息
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct UserStatistics {
+    pub user_name: String,
+    pub total_practices: i32,       // 总练习次数
+    pub total_correct: i32,         // 总正确数
+    pub total_incorrect: i32,       // 总错误数
+    pub total_words: i32,           // 总单词数
+    pub avg_accuracy: f64,          // 平均正确率
+    pub avg_wpm: f64,               // 平均WPM
+    pub best_accuracy: f64,         // 最高正确率
+    pub best_wpm: f64,              // 最高WPM
+    pub total_duration_minutes: f64, // 总练习时长(分钟)
+    pub recent_histories: Vec<PracticeHistory>, // 最近几次练习记录
+}

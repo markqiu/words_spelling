@@ -104,6 +104,25 @@ impl DatabaseManager {
 
             CREATE INDEX IF NOT EXISTS idx_word_mastery_user ON word_mastery(user_name);
             CREATE INDEX IF NOT EXISTS idx_word_mastery_review ON word_mastery(next_review_at);
+
+            -- 练习历史记录表
+            CREATE TABLE IF NOT EXISTS practice_history (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                user_name TEXT NOT NULL DEFAULT 'default',
+                article_id INTEGER NOT NULL,
+                segment_type TEXT NOT NULL,
+                correct_count INTEGER DEFAULT 0,
+                incorrect_count INTEGER DEFAULT 0,
+                total_count INTEGER DEFAULT 0,
+                accuracy REAL DEFAULT 0,
+                wpm REAL DEFAULT 0,
+                duration_seconds INTEGER DEFAULT 0,
+                completed_at TEXT DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (article_id) REFERENCES articles(id) ON DELETE CASCADE
+            );
+
+            CREATE INDEX IF NOT EXISTS idx_practice_history_user ON practice_history(user_name);
+            CREATE INDEX IF NOT EXISTS idx_practice_history_date ON practice_history(completed_at DESC);
             "#,
         )?;
         Ok(())
@@ -681,5 +700,139 @@ impl DatabaseManager {
         })?.collect();
         
         Ok(masteries?)
+    }
+
+    // ========== 练习历史记录 ==========
+
+    /// 保存练习历史
+    pub fn save_practice_history(
+        &self,
+        user_name: &str,
+        article_id: i64,
+        segment_type: &str,
+        correct_count: i32,
+        incorrect_count: i32,
+        duration_seconds: i32,
+    ) -> SqliteResult<()> {
+        let total_count = correct_count + incorrect_count;
+        let accuracy = if total_count > 0 {
+            (correct_count as f64 / total_count as f64) * 100.0
+        } else {
+            0.0
+        };
+        
+        // 计算WPM（每分钟单词数）
+        let wpm = if duration_seconds > 0 {
+            (total_count as f64 / duration_seconds as f64) * 60.0
+        } else {
+            0.0
+        };
+        
+        self.conn.execute(
+            "INSERT INTO practice_history (user_name, article_id, segment_type, correct_count, incorrect_count, total_count, accuracy, wpm, duration_seconds) 
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            rusqlite::params![
+                user_name,
+                article_id,
+                segment_type,
+                correct_count,
+                incorrect_count,
+                total_count,
+                accuracy,
+                wpm,
+                duration_seconds
+            ],
+        )?;
+        Ok(())
+    }
+
+    /// 获取用户练习历史
+    pub fn get_practice_history(
+        &self,
+        user_name: &str,
+        limit: i32,
+    ) -> SqliteResult<Vec<crate::models::PracticeHistory>> {
+        let sql = format!(
+            "SELECT h.id, h.user_name, h.article_id, a.title, h.segment_type, h.correct_count, h.incorrect_count, h.total_count, h.accuracy, h.wpm, h.duration_seconds, h.completed_at 
+             FROM practice_history h 
+             LEFT JOIN articles a ON h.article_id = a.id 
+             WHERE h.user_name = '{}' 
+             ORDER BY h.completed_at DESC 
+             LIMIT {}",
+            user_name, limit
+        );
+        
+        let mut stmt = self.conn.prepare(&sql)?;
+        let histories = stmt.query_map([], |row| {
+            Ok(crate::models::PracticeHistory {
+                id: row.get(0)?,
+                user_name: row.get(1)?,
+                article_id: row.get(2)?,
+                article_title: row.get(3).unwrap_or_else(|_| "未知文章".to_string()),
+                segment_type: row.get(4)?,
+                correct_count: row.get(5)?,
+                incorrect_count: row.get(6)?,
+                total_count: row.get(7)?,
+                accuracy: row.get(8)?,
+                wpm: row.get(9)?,
+                duration_seconds: row.get(10)?,
+                completed_at: row.get(11)?,
+            })
+        })?.collect::<SqliteResult<Vec<_>>>();
+        
+        histories
+    }
+
+    /// 获取用户统计信息
+    pub fn get_user_statistics(&self, user_name: &str) -> SqliteResult<crate::models::UserStatistics> {
+        // 总体统计
+        let stats_sql = format!(
+            "SELECT 
+                COUNT(*) as total_practices,
+                COALESCE(SUM(correct_count), 0) as total_correct,
+                COALESCE(SUM(incorrect_count), 0) as total_incorrect,
+                COALESCE(SUM(total_count), 0) as total_words,
+                COALESCE(AVG(accuracy), 0) as avg_accuracy,
+                COALESCE(AVG(wpm), 0) as avg_wpm,
+                COALESCE(MAX(accuracy), 0) as best_accuracy,
+                COALESCE(MAX(wpm), 0) as best_wpm,
+                COALESCE(SUM(duration_seconds), 0) as total_duration_seconds
+             FROM practice_history 
+             WHERE user_name = '{}'",
+            user_name
+        );
+        
+        let (total_practices, total_correct, total_incorrect, total_words, avg_accuracy, avg_wpm, best_accuracy, best_wpm, total_duration_seconds): (
+            i32, i32, i32, i32, f64, f64, f64, f64, i32
+        ) = self.conn.query_row(&stats_sql, [], |row| {
+            Ok((
+                row.get(0)?,
+                row.get(1)?,
+                row.get(2)?,
+                row.get(3)?,
+                row.get(4)?,
+                row.get(5)?,
+                row.get(6)?,
+                row.get(7)?,
+                row.get(8)?,
+            ))
+        })?;
+        
+        // 获取最近的练习记录
+        let recent_histories = self.get_practice_history(user_name, 10)?;
+        
+        Ok(crate::models::UserStatistics {
+            user_name: user_name.to_string(),
+            total_practices,
+            total_correct,
+            total_incorrect,
+            total_words,
+            avg_accuracy,
+            avg_wpm,
+            best_accuracy,
+            best_wpm,
+            total_duration_minutes: total_duration_seconds as f64 / 60.0,
+            recent_histories,
+        })
     }
 }
