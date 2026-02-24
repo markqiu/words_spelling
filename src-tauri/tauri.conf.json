@@ -1,7 +1,7 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
   "productName": "单词拼写练习",
-  "version": "2.0.1",
+  "version": "2.0.4",
   "identifier": "com.spellinggame.app",
   "build": {
     "beforeDevCommand": "npm run dev:frontend",

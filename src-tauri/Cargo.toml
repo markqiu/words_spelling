@@ -1,6 +1,6 @@
 [package]
 name = "spelling-game"
-version = "2.0.1"
+version = "2.0.4"
 description = "单词拼写与打字练习软件"
 authors = ["Spelling Game Team"]
 edition = "2021"
