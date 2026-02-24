@@ -5,6 +5,8 @@ import { ArticlesPage } from './pages/ArticlesPage'
 import { EditArticlePage } from './pages/EditArticlePage'
 import { PracticePage } from './pages/PracticePage'
 import { LeaderboardPage } from './pages/LeaderboardPage'
+import { WidaPage } from './pages/WidaPage'
+import { WidaTestPage } from './pages/WidaTestPage'
 import './styles/App.css'
 
 function App() {
@@ -18,7 +20,9 @@ function App() {
           <Route path="segment/:id" element={<EditArticlePage />} />
           <Route path="practice/:articleId/:mode" element={<PracticePage />} />
           <Route path="leaderboard" element={<LeaderboardPage />} />
+          <Route path="wida" element={<WidaPage />} />
         </Route>
+        <Route path="/wida/test/:sessionId" element={<WidaTestPage />} />
       </Routes>
     </div>
   )

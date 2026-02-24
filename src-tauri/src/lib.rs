@@ -23,6 +23,9 @@ pub fn run() {
             let db = database::DatabaseManager::new(&db_path)
                 .expect("Failed to initialize database");
             
+            // 初始化 WIDA 题库
+            db.seed_wida_questions().expect("Failed to seed WIDA questions");
+            
             // 将数据库实例存储到 state
             app.manage(std::sync::Mutex::new(db));
             
@@ -60,6 +63,27 @@ pub fn run() {
             commands::tts::stop_speaking,
             // 分词服务
             commands::segment::segment_text,
+            // WIDA 测试
+            commands::wida::get_wida_listening_questions,
+            commands::wida::get_wida_reading_questions,
+            commands::wida::get_wida_speaking_questions,
+            commands::wida::get_wida_writing_questions,
+            commands::wida::start_wida_test,
+            commands::wida::get_wida_test_session,
+            commands::wida::get_wida_test_questions,
+            commands::wida::submit_wida_answer,
+            commands::wida::complete_wida_test,
+            commands::wida::get_wida_history,
+            commands::wida::get_wida_comprehensive_report,
+            commands::wida::get_active_wida_sessions,
+            commands::wida::delete_wida_session,
+            // WIDA 题目生成
+            commands::wida::generate_listening_questions,
+            commands::wida::generate_reading_questions,
+            commands::wida::generate_speaking_questions,
+            commands::wida::generate_writing_questions,
+            commands::wida::save_api_settings,
+            commands::wida::load_api_settings,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

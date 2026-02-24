@@ -1,0 +1,169 @@
+[
+  {
+    "id": 1,
+    "grade_level": "grade_1_2",
+    "domain": "social_instructional",
+    "difficulty": 1,
+    "passage": "My name is Tom. I have a dog. My dog's name is Spot. Spot is brown and white. He likes to play with his ball.",
+    "question_text": "What color is Spot?",
+    "question_type": "multiple_choice",
+    "options": ["Black", "Brown and white", "Gray", "Yellow"],
+    "correct_answer": 1,
+    "explanation": "The passage says 'Spot is brown and white.'"
+  },
+  {
+    "id": 2,
+    "grade_level": "grade_1_2",
+    "domain": "mathematics",
+    "difficulty": 1,
+    "passage": "Sara has 3 red apples. She buys 2 more red apples at the store. Now Sara has apples to share with her friends.",
+    "question_text": "How many apples does Sara have in total?",
+    "question_type": "multiple_choice",
+    "options": ["3 apples", "2 apples", "5 apples", "6 apples"],
+    "correct_answer": 2,
+    "explanation": "3 + 2 = 5 apples."
+  },
+  {
+    "id": 3,
+    "grade_level": "grade_1_2",
+    "domain": "science",
+    "difficulty": 2,
+    "passage": "Fish live in water. They have fins to help them swim. Fish use gills to breathe underwater. Some fish are small, and some fish are very big.",
+    "question_text": "What do fish use to breathe underwater?",
+    "options": ["Lungs", "Fins", "Gills", "Nose"],
+    "correct_answer": 2,
+    "explanation": "The passage states that fish use gills to breathe underwater."
+  },
+  {
+    "id": 4,
+    "grade_level": "grade_3_5",
+    "domain": "language_arts",
+    "difficulty": 2,
+    "passage": "The Little Red Hen lived on a farm with a pig, a duck, and a cat. One day, she found some wheat seeds. She asked her friends, 'Who will help me plant these seeds?' 'Not I,' said the pig. 'Not I,' said the duck. 'Not I,' said the cat. So the Little Red Hen planted the seeds herself.",
+    "question_text": "Who helped the Little Red Hen plant the seeds?",
+    "options": ["The pig", "The duck", "The cat", "No one"],
+    "correct_answer": 3,
+    "explanation": "All the animals said 'Not I,' so the hen planted the seeds herself."
+  },
+  {
+    "id": 5,
+    "grade_level": "grade_3_5",
+    "domain": "science",
+    "difficulty": 3,
+    "passage": "Plants are very important for life on Earth. They take in carbon dioxide from the air and release oxygen. This process is called photosynthesis. Humans and animals need oxygen to breathe. Plants also provide food for many animals.",
+    "question_text": "What gas do plants release during photosynthesis?",
+    "options": ["Carbon dioxide", "Nitrogen", "Oxygen", "Hydrogen"],
+    "correct_answer": 2,
+    "explanation": "The passage says plants release oxygen during photosynthesis."
+  },
+  {
+    "id": 6,
+    "grade_level": "grade_3_5",
+    "domain": "mathematics",
+    "difficulty": 3,
+    "passage": "Maria baked 24 cookies for the school bake sale. She put 4 cookies in each bag. She sold each bag for $2.00. All the bags were sold at the bake sale.",
+    "question_text": "How many bags of cookies did Maria make?",
+    "options": ["4 bags", "6 bags", "8 bags", "12 bags"],
+    "correct_answer": 1,
+    "explanation": "24 cookies ÷ 4 cookies per bag = 6 bags."
+  },
+  {
+    "id": 7,
+    "grade_level": "grade_6_8",
+    "domain": "social_studies",
+    "difficulty": 3,
+    "passage": "Ancient Egypt was one of the world's oldest civilizations. The Egyptians built the famous pyramids as tombs for their pharaohs. They also developed a system of writing called hieroglyphics. The Nile River was very important to their civilization because it provided water for farming.",
+    "question_text": "Why was the Nile River important to Ancient Egyptians?",
+    "options": ["It was used for transportation only", "It provided water for farming", "It was a tourist attraction", "It marked the border with other countries"],
+    "correct_answer": 1,
+    "explanation": "The Nile provided water for farming, which was essential for their civilization."
+  },
+  {
+    "id": 8,
+    "grade_level": "grade_6_8",
+    "domain": "language_arts",
+    "difficulty": 4,
+    "passage": "The wind howled through the trees as the storm approached. Dark clouds gathered in the sky. Lightning flashed in the distance, followed by the rumble of thunder. Sarah hurried home, hoping to get inside before the rain began to fall.",
+    "question_text": "What mood does this passage create?",
+    "options": ["Happy and joyful", "Tense and suspenseful", "Calm and peaceful", "Funny and lighthearted"],
+    "correct_answer": 1,
+    "explanation": "Words like 'howled,' 'dark clouds,' and 'lightning' create a tense, suspenseful mood."
+  },
+  {
+    "id": 9,
+    "grade_level": "grade_6_8",
+    "domain": "science",
+    "difficulty": 4,
+    "passage": "Ecosystems are communities of living things interacting with each other and their environment. In a forest ecosystem, trees provide homes for birds and squirrels. Decomposers like fungi break down dead plants and animals, returning nutrients to the soil. All parts of an ecosystem depend on each other.",
+    "question_text": "What is the role of decomposers in an ecosystem?",
+    "options": ["They create new plants", "They break down dead matter and return nutrients to soil", "They hunt other animals", "They produce oxygen"],
+    "correct_answer": 1,
+    "explanation": "Decomposers break down dead plants and animals, returning nutrients to the soil."
+  },
+  {
+    "id": 10,
+    "grade_level": "grade_6_8",
+    "domain": "mathematics",
+    "difficulty": 4,
+    "passage": "A survey was conducted to find out students' favorite fruits. The results showed: Apples - 45 students, Bananas - 30 students, Oranges - 25 students, and Grapes - 20 students. The total number of students who participated was 120.",
+    "question_text": "What percentage of students chose apples as their favorite fruit?",
+    "options": ["25%", "37.5%", "45%", "30%"],
+    "correct_answer": 1,
+    "explanation": "(45 ÷ 120) × 100 = 37.5% of students chose apples."
+  },
+  {
+    "id": 11,
+    "grade_level": "grade_9_12",
+    "domain": "science",
+    "difficulty": 5,
+    "passage": "Climate change is primarily caused by the increase in greenhouse gases in Earth's atmosphere. Carbon dioxide, produced by burning fossil fuels, traps heat from the sun. This trapped heat leads to rising global temperatures, melting ice caps, and changing weather patterns. Scientists warn that immediate action is needed to reduce emissions.",
+    "question_text": "According to the passage, what is the main cause of climate change?",
+    "options": ["Natural weather cycles", "Increased greenhouse gases from fossil fuels", "Changes in the sun's radiation", "Movement of tectonic plates"],
+    "correct_answer": 1,
+    "explanation": "The passage states climate change is caused by increased greenhouse gases from burning fossil fuels."
+  },
+  {
+    "id": 12,
+    "grade_level": "grade_9_12",
+    "domain": "social_studies",
+    "difficulty": 5,
+    "passage": "The Great Depression was a severe worldwide economic depression that began in 1929. It was the longest and most severe depression ever experienced by the Western world. The stock market crash of 1929 marked the beginning of this economic crisis. Unemployment rates soared, and many people lost their savings and homes.",
+    "question_text": "When did the Great Depression begin?",
+    "options": ["1919", "1929", "1939", "1949"],
+    "correct_answer": 1,
+    "explanation": "The Great Depression began in 1929 with the stock market crash."
+  },
+  {
+    "id": 13,
+    "grade_level": "grade_9_12",
+    "domain": "language_arts",
+    "difficulty": 5,
+    "passage": "In George Orwell's '1984,' the government controls every aspect of people's lives. The Party watches everyone through telescreens and uses Newspeak to limit freedom of thought. The novel explores themes of totalitarianism, surveillance, and the manipulation of truth. Orwell wrote it as a warning about the dangers of unchecked government power.",
+    "question_text": "What is one way the Party controls people in '1984'?",
+    "options": ["By providing free healthcare", "By using Newspeak to limit freedom of thought", "By encouraging open debate", "By allowing free elections"],
+    "correct_answer": 1,
+    "explanation": "The Party uses Newspeak to limit what people can think and express."
+  },
+  {
+    "id": 14,
+    "grade_level": "grade_9_12",
+    "domain": "mathematics",
+    "difficulty": 6,
+    "passage": "Quadratic equations are equations of the form ax² + bx + c = 0. The quadratic formula, x = (-b ± √(b² - 4ac)) / 2a, can be used to find the solutions. For example, to solve x² - 5x + 6 = 0, we identify a=1, b=-5, and c=6.",
+    "question_text": "Using the quadratic formula, what are the solutions to x² - 5x + 6 = 0?",
+    "options": ["x = 2 and x = 3", "x = -2 and x = -3", "x = 1 and x = 6", "x = 0 and x = 5"],
+    "correct_answer": 0,
+    "explanation": "Using the quadratic formula: x = (5 ± √1) / 2, so x = 3 or x = 2."
+  },
+  {
+    "id": 15,
+    "grade_level": "grade_9_12",
+    "domain": "science",
+    "difficulty": 6,
+    "passage": "Einstein's theory of relativity revolutionized our understanding of space and time. Special relativity states that the speed of light is constant and that time and space are relative to the observer. The famous equation E=mc² shows the relationship between energy and mass, demonstrating that mass can be converted to energy.",
+    "question_text": "What does Einstein's equation E=mc² demonstrate?",
+    "options": ["Energy cannot be created or destroyed", "Mass can be converted to energy", "Light travels at different speeds", "Time is absolute"],
+    "correct_answer": 1,
+    "explanation": "E=mc² shows that mass can be converted to energy."
+  }
+]
