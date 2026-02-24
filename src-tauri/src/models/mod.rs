@@ -169,6 +169,7 @@ pub struct ScheduledWord {
     pub segment_type: String,
     pub mastery_level: i32,
     pub is_new: bool,           // 是否是新单词
+    pub next_review_at: String, // 下次复习时间（用于排序）
 }
 
 /// 练习历史记录

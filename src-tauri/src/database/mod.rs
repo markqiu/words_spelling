@@ -200,20 +200,77 @@ impl DatabaseManager {
     // ========== 分词管理 ==========
 
     pub fn save_segments(&mut self, article_id: i64, segment_type: &str, segments: &[String]) -> SqliteResult<()> {
-        // 先删除旧的分词
-        self.conn.execute(
+        let tx = self.conn.transaction()?;
+        
+        // 1. 在删除旧分词前，保存现有的 word_mastery 记录（按 content 映射）
+        let mut mastery_stmt = tx.prepare(
+            "SELECT segment_content, mastery_level, ease_factor, interval_days, 
+                    next_review_at, last_review_at, review_count 
+             FROM word_mastery 
+             WHERE segment_id IN (SELECT id FROM segments WHERE article_id = ? AND segment_type = ?)"
+        )?;
+        let old_mastery: Vec<(String, i32, f64, i32, String, String, i32)> = mastery_stmt
+            .query_map(rusqlite::params![article_id, segment_type], |row| {
+                Ok((
+                    row.get(0)?,  // segment_content
+                    row.get(1)?,  // mastery_level
+                    row.get(2)?,  // ease_factor
+                    row.get(3)?,  // interval_days
+                    row.get(4)?,  // next_review_at
+                    row.get(5)?,  // last_review_at
+                    row.get(6)?,  // review_count
+                ))
+            })?
+            .filter_map(|r| r.ok())
+            .collect();
+        drop(mastery_stmt);
+        
+        // 2. 删除旧的分词（word_mastery 会级联删除）
+        tx.execute(
             "DELETE FROM segments WHERE article_id = ? AND segment_type = ?",
             [article_id.to_string(), segment_type.to_string()],
         )?;
 
-        // 插入新的分词
-        let tx = self.conn.transaction()?;
+        // 3. 插入新的分词，并记录新生成的 ID
+        let mut new_segment_ids: Vec<i64> = Vec::new();
         for (index, segment) in segments.iter().enumerate() {
             tx.execute(
                 "INSERT INTO segments (article_id, segment_type, content, order_index) VALUES (?, ?, ?, ?)",
                 [article_id.to_string(), segment_type.to_string(), segment.clone(), index.to_string()],
             )?;
+            // 获取新插入的分词 ID
+            let new_id = tx.last_insert_rowid();
+            new_segment_ids.push(new_id);
         }
+        
+        // 4. 根据 content 匹配，恢复 word_mastery 记录
+        for (i, segment) in segments.iter().enumerate() {
+            let new_segment_id = new_segment_ids[i];
+            
+            // 查找该 content 是否有旧记录
+            if let Some((_, mastery_level, ease_factor, interval_days, next_review_at, last_review_at, review_count)) 
+                = old_mastery.iter().find(|(content, _, _, _, _, _, _)| content == segment) 
+            {
+                // 恢复 word_mastery 记录
+                tx.execute(
+                    "INSERT INTO word_mastery (user_name, segment_id, segment_content, segment_type, 
+                     mastery_level, ease_factor, interval_days, next_review_at, last_review_at, review_count)
+                     VALUES ('default', ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                    rusqlite::params![
+                        new_segment_id,
+                        segment,
+                        segment_type,
+                        mastery_level,
+                        ease_factor,
+                        interval_days,
+                        next_review_at,
+                        last_review_at,
+                        review_count
+                    ],
+                )?;
+            }
+        }
+        
         tx.commit()?;
         Ok(())
     }
@@ -489,18 +546,21 @@ impl DatabaseManager {
         // 3. 分类：到期复习的单词 + 未学习的新单词
         let mut review_words: Vec<crate::models::ScheduledWord> = vec![];
         let mut new_words: Vec<crate::models::ScheduledWord> = vec![];
+        let future_time = "2999-12-31 23:59:59"; // 新单词的未来时间
         
         for (segment_id, content, seg_type) in &all_segments {
             if let Some((mastery_level, next_review_at)) = mastery_map.get(segment_id) {
                 // 已学习过的，检查是否到期
-                if *next_review_at <= now || mastery_level < &3 {
-                    // 到期或熟练度较低，纳入复习
+                // 只有到期的单词才需要复习（除非是刚开始学习的新词）
+                if *next_review_at <= now {
+                    // 到期，纳入复习
                     review_words.push(crate::models::ScheduledWord {
                         segment_id: *segment_id,
                         content: content.clone(),
                         segment_type: seg_type.clone(),
                         mastery_level: *mastery_level,
                         is_new: false,
+                        next_review_at: next_review_at.clone(),
                     });
                 }
             } else {
@@ -511,13 +571,12 @@ impl DatabaseManager {
                     segment_type: seg_type.clone(),
                     mastery_level: 0,
                     is_new: true,
+                    next_review_at: future_time.to_string(),
                 });
             }
         }
         
         // 4. 合并：复习单词优先，新单词填充剩余位置
-        // 按熟练度从低到高排序（越生疏越前面）
-        review_words.sort_by_key(|w| w.mastery_level);
         
         // 合并逻辑：优先选满 limit 数量的单词
         // 如果复习单词足够，直接取 limit 个
@@ -534,17 +593,22 @@ impl DatabaseManager {
             result.truncate(limit as usize);
         }
         
-        // 随机打乱顺序
-        use std::collections::hash_map::DefaultHasher;
-        use std::hash::{Hash, Hasher};
-        let mut hasher = DefaultHasher::new();
-        std::time::SystemTime::now().hash(&mut hasher);
-        let seed = hasher.finish();
-        let result_len = result.len();
-        result.sort_by(move |_, _| {
-            let a: u64 = (seed.wrapping_mul(31).wrapping_add(result_len as u64)) % 100;
-            let b: u64 = (seed.wrapping_mul(37).wrapping_add(result_len as u64)) % 100;
-            a.cmp(&b)
+        // 按记忆曲线优先级排序：
+        // 1. 首先到期的单词优先（next_review_at 早的优先）
+        // 2. 同等条件下 mastery_level 低的优先（掌握程度差的优先）
+        // 3. 新单词按原始顺序（在最后）
+        result.sort_by(|a, b| {
+            // 新单词排在最后
+            if a.is_new != b.is_new {
+                return a.is_new.cmp(&b.is_new);
+            }
+            // 按下次复习时间排序（早的优先）
+            let time_cmp = a.next_review_at.cmp(&b.next_review_at);
+            if time_cmp != std::cmp::Ordering::Equal {
+                return time_cmp;
+            }
+            // 按掌握程度排序（低的优先）
+            a.mastery_level.cmp(&b.mastery_level)
         });
         
         // 统计新词和复习词数量
@@ -834,5 +898,327 @@ impl DatabaseManager {
             total_duration_minutes: total_duration_seconds as f64 / 60.0,
             recent_histories,
         })
+    }
+}
+
+// ========== 记忆曲线测试模块 ==========
+#[cfg(test)]
+mod tests {
+    use super::*;
+    
+    /// 创建测试数据库
+    fn create_test_db() -> DatabaseManager {
+        let conn = Connection::open_in_memory().unwrap();
+        let db = DatabaseManager { conn };
+        db.initialize_schema().unwrap();
+        db
+    }
+    
+    /// 创建测试文章和分词
+    fn setup_test_data(db: &mut DatabaseManager) -> (i64, i64, i64) {
+        // 创建文章
+        db.create_article("测试文章", "这是一篇测试文章").unwrap();
+        
+        // 添加分词
+        let article_id = 1;
+        let segments_vec: Vec<String> = vec![
+            "apple".to_string(), "banana".to_string(), "cherry".to_string(),
+            "date".to_string(), "elder".to_string()
+        ];
+        db.save_segments(article_id, "word", &segments_vec).unwrap();
+        
+        // 获取分词 ID（按 order_index 排序）
+        let segments = db.get_segments(article_id, "word").unwrap();
+        assert_eq!(segments.len(), 5);
+        
+        (article_id, segments[0].id, segments[1].id)
+    }
+    
+    /// 测试 1: 新单词答对 → 熟练度变为 1，间隔 1 天
+    #[test]
+    fn test_new_word_correct() {
+        let mut db = create_test_db();
+        let (_article_id, segment_id, _) = setup_test_data(&mut db);
+        
+        // 答对新单词
+        let result = db.update_word_mastery("default", segment_id, "apple", "word", true).unwrap();
+        
+        assert_eq!(result.mastery_level, 1);
+        assert_eq!(result.interval_days, 1);
+        assert_eq!(result.review_count, 1);
+    }
+    
+    /// 测试 2: 新单词答错 → 熟练度保持 0，间隔 0 天
+    #[test]
+    fn test_new_word_incorrect() {
+        let mut db = create_test_db();
+        let (_article_id, segment_id, _) = setup_test_data(&mut db);
+        
+        // 答错新单词
+        let result = db.update_word_mastery("default", segment_id, "apple", "word", false).unwrap();
+        
+        assert_eq!(result.mastery_level, 0);
+        assert_eq!(result.interval_days, 0);
+        assert_eq!(result.review_count, 0);
+    }
+    
+    /// 测试 3: 已学习单词答对 → 熟练度 +1
+    #[test]
+    fn test_existing_word_correct() {
+        let mut db = create_test_db();
+        let (_article_id, segment_id, _) = setup_test_data(&mut db);
+        
+        // 先答对，熟练度变为 1
+        db.update_word_mastery("default", segment_id, "apple", "word", true).unwrap();
+        
+        // 再次答对，熟练度变为 2
+        let result = db.update_word_mastery("default", segment_id, "apple", "word", true).unwrap();
+        
+        assert_eq!(result.mastery_level, 2);
+        assert_eq!(result.interval_days, 3); // 熟练度 2 → 间隔 3 天
+    }
+    
+    /// 测试 4: 已学习单词答错 → 熟练度 -1，间隔重置
+    #[test]
+    fn test_existing_word_incorrect() {
+        let mut db = create_test_db();
+        let (_article_id, segment_id, _) = setup_test_data(&mut db);
+        
+        // 先答对，熟练度变为 1
+        db.update_word_mastery("default", segment_id, "apple", "word", true).unwrap();
+        
+        // 答错，熟练度变为 0
+        let result = db.update_word_mastery("default", segment_id, "apple", "word", false).unwrap();
+        
+        assert_eq!(result.mastery_level, 0);
+        assert_eq!(result.interval_days, 0); // 立即需要复习
+    }
+    
+    /// 测试 5: 熟练度达到 5 后答对 → 保持 5，间隔 30 天
+    #[test]
+    fn test_max_mastery_level() {
+        let mut db = create_test_db();
+        let (_article_id, segment_id, _) = setup_test_data(&mut db);
+        
+        // 连续答对 5 次，达到熟练度 5
+        for _ in 0..5 {
+            db.update_word_mastery("default", segment_id, "apple", "word", true).unwrap();
+        }
+        
+        // 第 6 次答对，应该保持熟练度 5
+        let result = db.update_word_mastery("default", segment_id, "apple", "word", true).unwrap();
+        
+        assert_eq!(result.mastery_level, 5);
+        assert_eq!(result.interval_days, 30); // 熟练度 5 → 间隔 30 天
+    }
+    
+    /// 测试 6: 熟练度为 0 后答错 → 保持 0
+    #[test]
+    fn test_min_mastery_level() {
+        let mut db = create_test_db();
+        let (_article_id, segment_id, _) = setup_test_data(&mut db);
+        
+        // 答错，熟练度为 0
+        db.update_word_mastery("default", segment_id, "apple", "word", false).unwrap();
+        
+        // 再次答错，应该保持 0
+        let result = db.update_word_mastery("default", segment_id, "apple", "word", false).unwrap();
+        
+        assert_eq!(result.mastery_level, 0);
+    }
+    
+    /// 测试 7: 文章没有分词 → 返回空
+    #[test]
+    fn test_no_segments() {
+        let db = create_test_db();
+        let _ = db.create_article("空文章", "内容").unwrap();
+        
+        let result = db.get_scheduled_words("default", 1, "word", 10).unwrap();
+        
+        assert!(result.words.is_empty());
+        assert_eq!(result.new_words_count, 0);
+        assert_eq!(result.review_words_count, 0);
+    }
+    
+    /// 测试 8: 只有新词 → 返回新词
+    #[test]
+    fn test_only_new_words() {
+        let mut db = create_test_db();
+        let (article_id, _, _) = setup_test_data(&mut db);
+        
+        let result = db.get_scheduled_words("default", article_id, "word", 10).unwrap();
+        
+        assert_eq!(result.words.len(), 5);
+        assert_eq!(result.new_words_count, 5);
+        assert_eq!(result.review_words_count, 0);
+        
+        // 所有都是新词
+        for word in &result.words {
+            assert!(word.is_new);
+            assert_eq!(word.mastery_level, 0);
+        }
+    }
+    
+    /// 测试 9: 到期复习词优先于新词
+    #[test]
+    fn test_review_words_first() {
+        let mut db = create_test_db();
+        let (article_id, segment_id, _) = setup_test_data(&mut db);
+        
+        // 让第一个单词到期（答错，interval=0）
+        db.update_word_mastery("default", segment_id, "apple", "word", false).unwrap();
+        
+        let result = db.get_scheduled_words("default", article_id, "word", 5).unwrap();
+        
+        // 到期的复习词应该排在前面
+        assert_eq!(result.words.len(), 5);
+        assert_eq!(result.review_words_count, 1);
+        assert_eq!(result.new_words_count, 4);
+        
+        // 第一个应该是已复习的 apple
+        assert_eq!(result.words[0].content, "apple");
+        assert!(!result.words[0].is_new);
+    }
+    
+    /// 测试 10: 复习词数量超过 limit → 只返回 limit 个
+    #[test]
+    fn test_review_words_exceed_limit() {
+        let mut db = create_test_db();
+        let (article_id, segment_id1, segment_id2) = setup_test_data(&mut db);
+        
+        // 让两个单词都到期
+        db.update_word_mastery("default", segment_id1, "apple", "word", false).unwrap();
+        db.update_word_mastery("default", segment_id2, "banana", "word", false).unwrap();
+        
+        // limit = 1
+        let result = db.get_scheduled_words("default", article_id, "word", 1).unwrap();
+        
+        assert_eq!(result.words.len(), 1);
+        assert_eq!(result.review_words_count, 1);
+    }
+    
+    /// 测试 11: 复习词不足 limit → 补充新词
+    #[test]
+    fn test_review_words_insufficient() {
+        let mut db = create_test_db();
+        let (article_id, segment_id, _) = setup_test_data(&mut db);
+        
+        // 让一个单词到期
+        db.update_word_mastery("default", segment_id, "apple", "word", false).unwrap();
+        
+        // limit = 5，复习词只有 1 个，需要补充 4 个新词
+        let result = db.get_scheduled_words("default", article_id, "word", 5).unwrap();
+        
+        assert_eq!(result.words.len(), 5);
+        assert_eq!(result.review_words_count, 1);
+        assert_eq!(result.new_words_count, 4);
+    }
+    
+    /// 测试 12: 按熟练度排序 → 低的优先
+    #[test]
+    fn test_sort_by_mastery_level() {
+        let mut db = create_test_db();
+        let (article_id, segment_id1, segment_id2) = setup_test_data(&mut db);
+        
+        // apple 熟练度 2
+        db.update_word_mastery("default", segment_id1, "apple", "word", true).unwrap(); // 1
+        db.update_word_mastery("default", segment_id1, "apple", "word", true).unwrap(); // 2
+        
+        // banana 熟练度 1
+        db.update_word_mastery("default", segment_id2, "banana", "word", true).unwrap(); // 1
+        
+        // 让两个都到期
+        db.update_word_mastery("default", segment_id1, "apple", "word", false).unwrap();
+        db.update_word_mastery("default", segment_id2, "banana", "word", false).unwrap();
+        
+        let result = db.get_scheduled_words("default", article_id, "word", 5).unwrap();
+        
+        // 熟练度低的应该排在前面
+        assert_eq!(result.words[0].content, "banana"); // 熟练度 1
+        assert_eq!(result.words[1].content, "apple");  // 熟练度 2
+    }
+    
+    /// 测试 13: 重新分词后保留记忆曲线数据
+    #[test]
+    fn test_resegment_preserves_mastery() {
+        let mut db = create_test_db();
+        let (article_id, segment_id, _) = setup_test_data(&mut db);
+        
+        // 答错 apple（interval=0，当天到期）
+        db.update_word_mastery("default", segment_id, "apple", "word", false).unwrap();
+        
+        // 验证 apple 已学习（因为答错，当天到期）
+        let result1 = db.get_scheduled_words("default", article_id, "word", 10).unwrap();
+        
+        // 找到 apple
+        let apple_before = result1.words.iter().find(|w| w.content == "apple");
+        assert!(apple_before.is_some(), "apple should exist before resegment");
+        assert!(!apple_before.unwrap().is_new, "apple should not be new");
+        
+        // 重新分词：添加一个新词，保持原有词
+        let new_segments: Vec<String> = vec![
+            "apple".to_string(), "banana".to_string(), "new_word".to_string()
+        ];
+        db.save_segments(article_id, "word", &new_segments).unwrap();
+        
+        // 检查分词是否正确插入
+        let segments = db.get_segments(article_id, "word").unwrap();
+        assert_eq!(segments.len(), 3, "Expected 3 segments, got {}", segments.len());
+        
+        // 检查 apple 的熟练度是否保留
+        let result = db.get_scheduled_words("default", article_id, "word", 10).unwrap();
+        
+        // apple 应该是已学习的
+        let apple = result.words.iter().find(|w| w.content == "apple");
+        assert!(apple.is_some(), "apple should exist in scheduled words");
+        let apple = apple.unwrap();
+        assert!(!apple.is_new, "apple should not be new after resegment");
+        
+        // new_word 应该是新的
+        let new_word = result.words.iter().find(|w| w.content == "new_word").unwrap();
+        assert!(new_word.is_new);
+    }
+    
+    /// 测试 14: 难度因子调整
+    #[test]
+    fn test_ease_factor() {
+        let mut db = create_test_db();
+        let (_article_id, segment_id, _) = setup_test_data(&mut db);
+        
+        // 第一次答对 → ease_factor 保持 2.5（初始值）
+        let result1 = db.update_word_mastery("default", segment_id, "apple", "word", true).unwrap();
+        assert_eq!(result1.ease_factor, 2.5);
+        
+        // 第二次答对 → ease_factor 增加
+        let result2 = db.update_word_mastery("default", segment_id, "apple", "word", true).unwrap();
+        assert!(result2.ease_factor > 2.5);
+        
+        // 答错 → ease_factor 减少
+        let result3 = db.update_word_mastery("default", segment_id, "apple", "word", false).unwrap();
+        assert!(result3.ease_factor < result2.ease_factor);
+        
+        // ease_factor 应该在 1.3 ~ 3.0 范围内
+        assert!(result3.ease_factor >= 1.3);
+    }
+    
+    /// 测试 15: 间隔天数正确计算
+    #[test]
+    fn test_interval_days() {
+        let mut db = create_test_db();
+        let (_article_id, segment_id, _) = setup_test_data(&mut db);
+        
+        // 熟练度 0 → 间隔 1 天
+        db.update_word_mastery("default", segment_id, "apple", "word", true).unwrap();
+        let r1 = db.update_word_mastery("default", segment_id, "apple", "word", true).unwrap();
+        assert_eq!(r1.interval_days, 3); // 熟练度 2
+        
+        let r2 = db.update_word_mastery("default", segment_id, "apple", "word", true).unwrap();
+        assert_eq!(r2.interval_days, 7); // 熟练度 3
+        
+        let r3 = db.update_word_mastery("default", segment_id, "apple", "word", true).unwrap();
+        assert_eq!(r3.interval_days, 14); // 熟练度 4
+        
+        let r4 = db.update_word_mastery("default", segment_id, "apple", "word", true).unwrap();
+        assert_eq!(r4.interval_days, 30); // 熟练度 5
     }
 }
