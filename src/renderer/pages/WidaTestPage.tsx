@@ -164,31 +164,83 @@ export function WidaTestPage() {
 
   // 开始录音
   const startRecording = useCallback(async () => {
+    // 检查浏览器支持
+    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+      alert('您的浏览器不支持录音功能，请使用最新版本的 Chrome、Firefox 或 Safari')
+      return
+    }
+
+    if (!window.MediaRecorder) {
+      alert('您的浏览器不支持 MediaRecorder API')
+      return
+    }
+
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
-      const recorder = new MediaRecorder(stream)
+      console.log('Requesting microphone access...')
+      const stream = await navigator.mediaDevices.getUserMedia({ 
+        audio: {
+          echoCancellation: true,
+          noiseSuppression: true,
+          autoGainControl: true
+        } 
+      })
+      
+      console.log('Microphone access granted')
+      
+      // 获取支持的 mime type
+      const mimeType = MediaRecorder.isTypeSupported('audio/webm') 
+        ? 'audio/webm' 
+        : MediaRecorder.isTypeSupported('audio/mp4') 
+        ? 'audio/mp4' 
+        : 'audio/ogg'
+      
+      console.log('Using mime type:', mimeType)
+      
+      const recorder = new MediaRecorder(stream, { mimeType })
       const chunks: BlobPart[] = []
       
       recorder.ondataavailable = (e) => {
+        console.log('Data available:', e.data.size)
         if (e.data.size > 0) {
           chunks.push(e.data)
         }
       }
       
       recorder.onstop = () => {
-        const blob = new Blob(chunks, { type: 'audio/webm' })
-        const url = URL.createObjectURL(blob)
-        setAudioURL(url)
+        console.log('Recording stopped, chunks:', chunks.length)
+        if (chunks.length > 0) {
+          const blob = new Blob(chunks, { type: mimeType })
+          const url = URL.createObjectURL(blob)
+          setAudioURL(url)
+          console.log('Audio URL created:', url)
+        }
         stream.getTracks().forEach(track => track.stop())
       }
       
-      recorder.start()
+      recorder.onerror = (e) => {
+        console.error('MediaRecorder error:', e)
+        alert('录音出现错误，请重试')
+      }
+      
+      // 每 100ms 收集一次数据
+      recorder.start(100)
       setMediaRecorder(recorder)
       setIsRecording(true)
       setAudioURL(null) // 清除之前的录音
+      console.log('Recording started')
     } catch (error) {
       console.error('Failed to start recording:', error)
-      alert('无法访问麦克风，请确保已授予麦克风权限')
+      if (error instanceof DOMException) {
+        if (error.name === 'NotAllowedError') {
+          alert('麦克风权限被拒绝。请检查系统设置，允许此应用访问麦克风。')
+        } else if (error.name === 'NotFoundError') {
+          alert('未找到麦克风设备，请确保麦克风已连接')
+        } else {
+          alert(`无法访问麦克风: ${error.name} - ${error.message}`)
+        }
+      } else {
+        alert('无法访问麦克风，请确保已授予麦克风权限')
+      }
     }
   }, [])
 
