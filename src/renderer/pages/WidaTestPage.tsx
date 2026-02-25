@@ -409,14 +409,29 @@ export function WidaTestPage() {
     </div>
   )
 
-  const renderSpeakingQuestion = (question: WidaSpeakingQuestion) => (
+  const renderSpeakingQuestion = (question: WidaSpeakingQuestion) => {
+    // Debug: log image URL
+    console.log('Speaking question image_url:', question.image_url)
+    
+    return (
     <div className="question-container speaking-question">
       <div className="prompt-section">
         <div className="prompt-text">{question.prompt_text}</div>
         
-        {question.image_url && (
+        {question.image_url ? (
           <div className="image-section">
-            <img src={question.image_url} alt="Prompt" />
+            <img 
+              src={question.image_url} 
+              alt="Prompt" 
+              onError={(e) => {
+                console.error('Image failed to load:', question.image_url)
+                e.currentTarget.style.display = 'none'
+              }}
+            />
+          </div>
+        ) : (
+          <div className="image-section no-image">
+            <span>🖼️ 图片加载失败</span>
           </div>
         )}
       </div>
@@ -506,6 +521,7 @@ export function WidaTestPage() {
       </div>
     </div>
   )
+  }
 
   const renderWritingQuestion = (question: WidaWritingQuestion) => (
     <div className="question-container writing-question">
