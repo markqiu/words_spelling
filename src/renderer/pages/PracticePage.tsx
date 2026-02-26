@@ -19,6 +19,57 @@ interface PracticeItem {
   isNew: boolean
 }
 
+// 练习进度保存接口
+interface PracticeProgress {
+  userName: string
+  articleId: number
+  practiceMode: PracticeMode
+  practiceLimit: number
+  practiceList: PracticeItem[]
+  currentIndex: number
+  stats: PracticeStats
+  startTime: number
+  savedAt: number
+}
+
+// 获取进度存储 key
+const getProgressKey = (userName: string, articleId: string, mode: string) => 
+  `practice_progress_${userName}_${articleId}_${mode}`
+
+// 保存进度到 localStorage
+const saveProgress = (progress: PracticeProgress) => {
+  try {
+    const key = getProgressKey(progress.userName, String(progress.articleId), progress.practiceMode)
+    localStorage.setItem(key, JSON.stringify(progress))
+  } catch (e) {
+    console.error('Failed to save progress:', e)
+  }
+}
+
+// 加载进度
+const loadProgress = (userName: string, articleId: string, mode: string): PracticeProgress | null => {
+  try {
+    const key = getProgressKey(userName, articleId, mode)
+    const data = localStorage.getItem(key)
+    if (data) {
+      return JSON.parse(data) as PracticeProgress
+    }
+  } catch (e) {
+    console.error('Failed to load progress:', e)
+  }
+  return null
+}
+
+// 清除进度
+const clearProgress = (userName: string, articleId: string, mode: string) => {
+  try {
+    const key = getProgressKey(userName, articleId, mode)
+    localStorage.removeItem(key)
+  } catch (e) {
+    console.error('Failed to clear progress:', e)
+  }
+}
+
 export function PracticePage() {
   const { articleId, mode } = useParams<{ articleId: string; mode: string }>()
   const location = useLocation()
@@ -44,16 +95,22 @@ export function PracticePage() {
   // 统计
   const statsRef = useRef<PracticeStats>({ correct: 0, incorrect: 0 })
   const [isCompleted, setIsCompleted] = useState(false)
+  
+  // 强制重试模式：当还没有错误时，答错必须改对才能继续
+  const [mustRetryMode, setMustRetryMode] = useState(false)
   const startTimeRef = useRef<number>(0) // 记录开始时间
   const [elapsedTime, setElapsedTime] = useState(0) // 经过的时间（秒）
   
   // 当前练习的片段列表（智能调度）
   const [practiceList, setPracticeList] = useState<PracticeItem[]>([])
   
+  // 保存的进度（用于显示继续选项）
+  const [savedProgress, setSavedProgress] = useState<PracticeProgress | null>(null)
+  
   // 输入框引用
   const inputRef = useRef<HTMLInputElement>(null)
 
-  // 加载文章和分词
+  // 加载文章和分词，同时检查是否有保存的进度
   useEffect(() => {
     if (!articleId) return
     
@@ -79,6 +136,15 @@ export function PracticePage() {
         }
         setSegments(segs.map(s => s.content))
         
+        // 检查是否有保存的进度（24小时内有效）
+        const progress = loadProgress(userName, articleId, practiceMode)
+        if (progress && Date.now() - progress.savedAt < 24 * 60 * 60 * 1000) {
+          setSavedProgress(progress)
+        } else if (progress) {
+          // 超过24小时，清除旧进度
+          clearProgress(userName, articleId, practiceMode)
+        }
+        
       } catch (error) {
         console.error('Error loading data:', error)
         alert('加载数据失败')
@@ -96,6 +162,13 @@ export function PracticePage() {
       inputRef.current.focus()
     }
   }, [currentIndex, showSettings, isCompleted, showResult])
+  
+  // 当答对时，确保退出强制重试模式
+  useEffect(() => {
+    if (isCorrect && mustRetryMode) {
+      setMustRetryMode(false)
+    }
+  }, [isCorrect, mustRetryMode])
 
   // 计时器
   useEffect(() => {
@@ -124,8 +197,8 @@ export function PracticePage() {
     const numId = parseInt(articleId)
     
     try {
-      // 调用智能调度API获取单词
-      const response = await api.getScheduledWords(userName, numId, practiceMode, practiceLimit)
+      // 获取所有单词（limit=0 表示全部），按记忆曲线排序
+      const response = await api.getScheduledWords(userName, numId, practiceMode, 0)
       
       if (response.words.length === 0) {
         alert('该文章没有可练习的单词，请先进行分词')
@@ -133,7 +206,7 @@ export function PracticePage() {
       }
       
       // 转换为 PracticeItem 格式
-      const list: PracticeItem[] = response.words.map(w => ({
+      const allWords: PracticeItem[] = response.words.map(w => ({
         segmentId: w.segment_id,
         content: w.content,
         segmentType: w.segment_type,
@@ -141,10 +214,14 @@ export function PracticePage() {
         isNew: w.is_new
       }))
       
+      // 根据选择的数量截取（0 表示全部）
+      const list = practiceLimit === 0 ? allWords : allWords.slice(0, practiceLimit)
+      
       setPracticeList(list)
       setShowSettings(false)
       setCurrentIndex(0)
       statsRef.current = { correct: 0, incorrect: 0 }
+      setMustRetryMode(false)
       startTimeRef.current = Date.now() // 记录开始时间
       
       // 播放第一个单词
@@ -156,6 +233,25 @@ export function PracticePage() {
       alert('加载练习内容失败')
     }
   }, [userName, articleId, practiceMode, practiceLimit])
+
+  // 继续练习（恢复保存的进度）
+  const resumePractice = useCallback(() => {
+    if (!savedProgress) return
+    
+    setPracticeList(savedProgress.practiceList)
+    setPracticeLimit(savedProgress.practiceLimit)
+    setShowSettings(false)
+    setCurrentIndex(savedProgress.currentIndex)
+    statsRef.current = savedProgress.stats
+    startTimeRef.current = savedProgress.startTime
+    setMustRetryMode(false)
+    setSavedProgress(null)
+    
+    // 播放当前单词
+    if (savedProgress.practiceList.length > savedProgress.currentIndex) {
+      setTimeout(() => playAudio(savedProgress.practiceList[savedProgress.currentIndex].content), 100)
+    }
+  }, [savedProgress])
 
   // 播放音频
   const playAudio = async (text: string) => {
@@ -211,8 +307,12 @@ export function PracticePage() {
     // 更新统计
     if (correct) {
       statsRef.current.correct++
+      // 答对了，退出强制重试模式（useEffect 也会确保这一点）
+      setMustRetryMode(false)
     } else {
       statsRef.current.incorrect++
+      // 答错了，进入强制重试模式（必须改对才能继续）
+      setMustRetryMode(true)
     }
     
     // 更新单词熟练度（SM-2 算法）
@@ -228,24 +328,53 @@ export function PracticePage() {
       console.error('Error updating mastery:', error)
     }
   }
+  
+  // 重试当前单词（不清空输入，让用户可以修改）
+  const handleRetry = () => {
+    // 不清空输入，让用户可以在原答案基础上修改
+    setShowResult(false)
+    inputRef.current?.focus()
+    // 选中全部文本，方便用户直接重新输入
+    inputRef.current?.select()
+  }
 
   // 下一个
   const handleNext = () => {
     setShowResult(false)
     setUserInput('')
+    setMustRetryMode(false) // 进入下一个单词时重置强制重试状态
     
     if (currentIndex + 1 >= practiceList.length) {
       // 完成
       completePractice()
     } else {
-      setCurrentIndex(prev => prev + 1)
-      playAudio(practiceList[currentIndex + 1].content)
+      const nextIndex = currentIndex + 1
+      setCurrentIndex(nextIndex)
+      playAudio(practiceList[nextIndex].content)
+      
+      // 保存进度
+      if (articleId) {
+        saveProgress({
+          userName,
+          articleId: parseInt(articleId),
+          practiceMode,
+          practiceLimit,
+          practiceList,
+          currentIndex: nextIndex,
+          stats: { ...statsRef.current },
+          startTime: startTimeRef.current,
+          savedAt: Date.now()
+        })
+      }
     }
   }
 
   // 完成练习
   const completePractice = async () => {
     if (!articleId) return
+    
+    // 清除保存的进度
+    clearProgress(userName, articleId, practiceMode)
     
     setIsCompleted(true)
     
@@ -410,6 +539,41 @@ export function PracticePage() {
             共 {segments.length} 个{getModeUnit(practiceMode)}
           </p>
           
+          {/* 显示继续练习选项 */}
+          {savedProgress && (
+            <div className="resume-prompt">
+              <div className="resume-info">
+                <span className="resume-icon">📝</span>
+                <span>检测到未完成的练习</span>
+                <span className="resume-detail">
+                  第 {savedProgress.currentIndex + 1} / {savedProgress.practiceList.length} 个
+                  （已答对 {savedProgress.stats.correct} 个）
+                </span>
+              </div>
+              <div className="resume-actions">
+                <button
+                  className="btn btn-primary resume-btn"
+                  onClick={resumePractice}
+                  type="button"
+                >
+                  继续练习
+                </button>
+                <button
+                  className="btn btn-secondary"
+                  onClick={() => {
+                    if (articleId) {
+                      clearProgress(userName, articleId, practiceMode)
+                    }
+                    setSavedProgress(null)
+                  }}
+                  type="button"
+                >
+                  重新开始
+                </button>
+              </div>
+            </div>
+          )}
+          
           <div className="settings-form">
             <div className="form-group">
               <label htmlFor="limit">本次练习数量</label>
@@ -418,24 +582,38 @@ export function PracticePage() {
                 value={practiceLimit}
                 onChange={(e) => setPracticeLimit(parseInt(e.target.value))}
               >
+                <option value="0">全部</option>
                 <option value="10">10个</option>
                 <option value="20">20个</option>
                 <option value="30">30个</option>
                 <option value="50">50个</option>
+                <option value="60">60个</option>
+                <option value="80">80个</option>
+                <option value="100">100个</option>
+                <option value="120">120个</option>
+                <option value="150">150个</option>
+                <option value="180">180个</option>
+                <option value="200">200个</option>
               </select>
             </div>
             <p className="hint-text">
-              系统将根据记忆曲线自动选择需要复习的单词
+              系统会对所有单词按记忆曲线排序，优先练习最需要复习的单词
             </p>
           </div>
           
           <div className="settings-actions">
             <button
               className="btn btn-primary"
-              onClick={() => startPractice()}
+              onClick={() => {
+                if (savedProgress && articleId) {
+                  clearProgress(userName, articleId, practiceMode)
+                  setSavedProgress(null)
+                }
+                startPractice()
+              }}
               type="button"
             >
-              开始练习 (Enter)
+              {savedProgress ? '重新开始练习' : '开始练习'} (Enter)
             </button>
             <button
               className="btn btn-secondary"
@@ -497,6 +675,9 @@ export function PracticePage() {
                 e.stopPropagation()
                 if (!showResult) {
                   checkAnswer()
+                } else if (mustRetryMode && !isCorrect) {
+                  // 强制重试模式且错误时，按 Enter 重试
+                  handleRetry()
                 } else {
                   handleNext()
                 }
@@ -522,22 +703,21 @@ export function PracticePage() {
             <div className="result-buttons">
               <button
                 className="btn btn-secondary"
-                onClick={() => {
-                  setUserInput('')
-                  setShowResult(false)
-                  inputRef.current?.focus()
-                }}
+                onClick={handleRetry}
                 type="button"
               >
                 重试
               </button>
-              <button
-                className="btn btn-primary"
-                onClick={handleNext}
-                type="button"
-              >
-                {currentIndex + 1 >= practiceList.length ? '完成 (Enter)' : '下一个 (Enter)'}
-              </button>
+              {/* 只有在强制重试模式且错误时，不显示"下一个"按钮 */}
+              {!(mustRetryMode && !isCorrect) && (
+                <button
+                  className="btn btn-primary"
+                  onClick={handleNext}
+                  type="button"
+                >
+                  {currentIndex + 1 >= practiceList.length ? '完成 (Enter)' : '下一个 (Enter)'}
+                </button>
+              )}
             </div>
           )}
         </div>
@@ -548,22 +728,29 @@ export function PracticePage() {
               {isCorrect ? '✅ 正确！' : '❌ 错误'}
             </div>
             {!isCorrect && (
-              <div className="diff-comparison">
-                <div className="diff-row">
-                  <span className="diff-label">你的输入：</span>
-                  <DiffDisplay 
-                    display={diffChars(userInput, practiceList[currentIndex].content).userDisplay} 
-                    type="user"
-                  />
+              <>
+                <div className="diff-comparison">
+                  <div className="diff-row">
+                    <span className="diff-label">你的输入：</span>
+                    <DiffDisplay 
+                      display={diffChars(userInput, practiceList[currentIndex].content).userDisplay} 
+                      type="user"
+                    />
+                  </div>
+                  <div className="diff-row">
+                    <span className="diff-label">正确答案：</span>
+                    <DiffDisplay 
+                      display={diffChars(userInput, practiceList[currentIndex].content).answerDisplay} 
+                      type="answer"
+                    />
+                  </div>
                 </div>
-                <div className="diff-row">
-                  <span className="diff-label">正确答案：</span>
-                  <DiffDisplay 
-                    display={diffChars(userInput, practiceList[currentIndex].content).answerDisplay} 
-                    type="answer"
-                  />
-                </div>
-              </div>
+                {mustRetryMode && (
+                  <div className="must-retry-hint">
+                    💪 答错了，请修改正确后继续！
+                  </div>
+                )}
+              </>
             )}
           </div>
         )}

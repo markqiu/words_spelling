@@ -679,32 +679,12 @@ impl DatabaseManager {
             }
         }
         
-        // 4. 合并：复习单词优先，新单词填充剩余位置
+        // 4. 先排序，再合并截取（确保选出最需要复习的单词）
         
-        // 合并逻辑：优先选满 limit 数量的单词
-        // 如果复习单词足够，直接取 limit 个
-        // 如果复习单词不足，用新单词填满
-        let mut result: Vec<_> = review_words.clone();
-        
-        if result.len() < limit as usize {
-            // 复习单词不够，从新单词中补充
-            let remaining = limit as usize - result.len();
-            let new_to_add: Vec<_> = new_words.into_iter().take(remaining).collect();
-            result.extend(new_to_add);
-        } else {
-            // 复习单词足够，只取前 limit 个
-            result.truncate(limit as usize);
-        }
-        
-        // 按记忆曲线优先级排序：
+        // 对复习词按记忆曲线优先级排序：
         // 1. 首先到期的单词优先（next_review_at 早的优先）
         // 2. 同等条件下 mastery_level 低的优先（掌握程度差的优先）
-        // 3. 新单词按原始顺序（在最后）
-        result.sort_by(|a, b| {
-            // 新单词排在最后
-            if a.is_new != b.is_new {
-                return a.is_new.cmp(&b.is_new);
-            }
+        review_words.sort_by(|a, b| {
             // 按下次复习时间排序（早的优先）
             let time_cmp = a.next_review_at.cmp(&b.next_review_at);
             if time_cmp != std::cmp::Ordering::Equal {
@@ -713,6 +693,20 @@ impl DatabaseManager {
             // 按掌握程度排序（低的优先）
             a.mastery_level.cmp(&b.mastery_level)
         });
+        
+        // 合并逻辑：复习单词优先（已排序），新单词填充剩余位置
+        // limit = 0 表示不限制，返回所有单词
+        let effective_limit = if limit == 0 { usize::MAX } else { limit as usize };
+        
+        // 先取排序后的复习词
+        let mut result: Vec<_> = review_words.into_iter().take(effective_limit).collect();
+        
+        // 如果复习单词不够，用新单词填满
+        if result.len() < effective_limit {
+            let remaining = effective_limit - result.len();
+            let new_to_add: Vec<_> = new_words.into_iter().take(remaining).collect();
+            result.extend(new_to_add);
+        }
         
         // 统计新词和复习词数量
         let new_count = result.iter().filter(|w| w.is_new).count() as i32;
